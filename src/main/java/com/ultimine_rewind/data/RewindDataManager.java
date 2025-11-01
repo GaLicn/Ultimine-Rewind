@@ -52,6 +52,19 @@ public class RewindDataManager {
     }
     
     /**
+     * 更新玩家的撤销记录（部分恢复后）
+     * @param playerId 玩家ID
+     * @param newRecord 新的记录（如果为null则清除记录）
+     */
+    public static void updateRecord(UUID playerId, UltimineRecord newRecord) {
+        if (newRecord == null || newRecord.getBlocks().isEmpty()) {
+            playerRecords.remove(playerId);
+        } else {
+            playerRecords.put(playerId, newRecord);
+        }
+    }
+    
+    /**
      * 清除所有过期的记录
      */
     public static void cleanupExpiredRecords() {

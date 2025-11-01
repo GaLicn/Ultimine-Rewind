@@ -36,45 +36,61 @@ public class RewindExecutor {
         // 1. 验证物品（创造模式跳过）
         if (!menu.validateItems()) {
             player.displayClientMessage(
-                Component.literal("物品不足，无法恢复").withStyle(ChatFormatting.RED),
+                Component.translatable("message.ultimine_rewind.no_materials").withStyle(ChatFormatting.RED),
                 false
             );
             return false;
         }
         
-        // 2. 检查所有方块位置是否可以放置
-        for (BlockRecord blockRecord : record.getBlocks()) {
+        // 计算可以恢复多少个方块
+        int restorableCount = menu.getRestorableBlockCount();
+        if (restorableCount <= 0 && !isCreative) {
+            player.displayClientMessage(
+                Component.translatable("message.ultimine_rewind.insufficient_materials").withStyle(ChatFormatting.RED),
+                false
+            );
+            return false;
+        }
+        
+        // 2. 确定要恢复的方块列表（部分或全部）
+        int blocksToRestore = isCreative ? record.getBlockCount() : Math.min(restorableCount, record.getBlockCount());
+        java.util.List<BlockRecord> blocksToProcess = record.getBlocks().subList(0, blocksToRestore);
+        
+        // 3. 检查方块位置是否可以放置
+        for (BlockRecord blockRecord : blocksToProcess) {
             BlockPos pos = blockRecord.getPos();
             
             // 检查区块是否加载
             if (!level.isLoaded(pos)) {
-                player.displayClientMessage(
-                    Component.literal("某些区块未加载，无法恢复").withStyle(ChatFormatting.RED),
-                    false
-                );
-                return false;
+                // 静默跳过，不显示消息（避免刷屏）
+                continue;
             }
             
             // 检查位置是否可以放置方块
             BlockState currentState = level.getBlockState(pos);
             // 只允许在空气或可替换的方块位置恢复
             if (!currentState.isAir() && !currentState.canBeReplaced()) {
-                player.displayClientMessage(
-                    Component.literal("某些位置已被占用，无法恢复").withStyle(ChatFormatting.RED),
-                    false
-                );
-                return false;
+                // 跳过已被占用的位置，继续恢复其他方块
+                continue;
             }
         }
         
-        // 3. 消耗物品并返还剩余物品（创造模式不消耗）
-        menu.consumeItemsAndReturnRest();
-        
-        // 4. 恢复所有方块
+        // 4. 恢复方块
         int restoredCount = 0;
-        for (BlockRecord blockRecord : record.getBlocks()) {
+        for (BlockRecord blockRecord : blocksToProcess) {
             BlockPos pos = blockRecord.getPos();
             BlockState state = blockRecord.getState();
+            
+            // 检查区块是否加载
+            if (!level.isLoaded(pos)) {
+                continue;
+            }
+            
+            // 检查位置是否可用
+            BlockState currentState = level.getBlockState(pos);
+            if (!currentState.isAir() && !currentState.canBeReplaced()) {
+                continue;
+            }
             
             // 放置方块
             level.setBlock(pos, state, Block.UPDATE_ALL | Block.UPDATE_CLIENTS);
@@ -91,22 +107,44 @@ public class RewindExecutor {
             restoredCount++;
         }
         
-        // 5. 清除记录
-        RewindDataManager.clearRecord(player.getUUID());
+        // 5. 消耗物品并返还剩余物品（在恢复完成后）
+        menu.consumeItemsAndReturnRest();
         
-        // 6. 发送成功消息
-        if (isCreative) {
+        // 6. 更新或清除记录
+        int totalBlocks = record.getBlockCount();
+        if (restoredCount < totalBlocks) {
+            // 部分恢复，保留剩余方块的记录
+            UltimineRecord newRecord = record.removeRestoredBlocks(restoredCount);
+            RewindDataManager.updateRecord(player.getUUID(), newRecord);
+            
+            int remaining = totalBlocks - restoredCount;
             player.displayClientMessage(
-                Component.literal("成功恢复 " + restoredCount + " 个方块（创造模式）")
-                    .withStyle(ChatFormatting.GREEN),
+                Component.translatable("message.ultimine_rewind.partial_restore", restoredCount, totalBlocks)
+                    .withStyle(ChatFormatting.YELLOW),
                 false
+            );
+            player.displayClientMessage(
+                Component.translatable("message.ultimine_rewind.remaining", remaining)
+                    .withStyle(ChatFormatting.GRAY),
+                true
             );
         } else {
-            player.displayClientMessage(
-                Component.literal("成功恢复 " + restoredCount + " 个方块")
-                    .withStyle(ChatFormatting.GREEN),
-                false
-            );
+            // 完全恢复，清除记录
+            RewindDataManager.clearRecord(player.getUUID());
+            
+            if (isCreative) {
+                player.displayClientMessage(
+                    Component.translatable("message.ultimine_rewind.success_creative", restoredCount)
+                        .withStyle(ChatFormatting.GREEN),
+                    false
+                );
+            } else {
+                player.displayClientMessage(
+                    Component.translatable("message.ultimine_rewind.success", restoredCount)
+                        .withStyle(ChatFormatting.GREEN),
+                    false
+                );
+            }
         }
         
         return true;

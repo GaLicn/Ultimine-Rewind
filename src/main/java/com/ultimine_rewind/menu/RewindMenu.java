@@ -115,7 +115,7 @@ public class RewindMenu extends AbstractContainerMenu {
     }
     
     /**
-     * 验证物品是否足够
+     * 验证物品是否足够（现在只要有物品就可以，支持部分恢复）
      */
     public boolean validateItems() {
         if (record == null) {
@@ -127,10 +127,38 @@ public class RewindMenu extends AbstractContainerMenu {
             return true;
         }
         
+        // 修改：只要容器中有任何物品就允许恢复（部分恢复）
+        // 或者至少有一种需要的物品
         Map<Item, Integer> required = record.getRequiredItems();
-        Map<Item, Integer> provided = new HashMap<>();
+        
+        for (int i = 0; i < CONTAINER_SIZE; i++) {
+            ItemStack stack = this.getSlot(i).getItem();
+            if (!stack.isEmpty() && required.containsKey(stack.getItem())) {
+                // 只要有至少一个需要的物品，就允许恢复
+                return true;
+            }
+        }
+        
+        // 如果没有任何需要的物品，禁用按钮
+        return false;
+    }
+    
+    /**
+     * 计算可以恢复多少个方块
+     * @return 可恢复的方块数量
+     */
+    public int getRestorableBlockCount() {
+        if (record == null) {
+            return 0;
+        }
+        
+        // 创造模式可以恢复所有方块
+        if (player != null && player.isCreative()) {
+            return record.getBlockCount();
+        }
         
         // 统计容器中的物品
+        Map<Item, Integer> provided = new HashMap<>();
         for (int i = 0; i < CONTAINER_SIZE; i++) {
             ItemStack stack = this.getSlot(i).getItem();
             if (!stack.isEmpty()) {
@@ -138,26 +166,37 @@ public class RewindMenu extends AbstractContainerMenu {
             }
         }
         
-        // 检查每种物品是否足够
+        // 计算每种物品最多能恢复多少个方块
+        Map<Item, Integer> required = record.getRequiredItems();
+        int totalRequired = required.values().stream().mapToInt(Integer::intValue).sum();
+        
+        if (totalRequired == 0) {
+            return 0;
+        }
+        
+        // 计算最小比例
+        int canRestore = Integer.MAX_VALUE;
         for (Map.Entry<Item, Integer> entry : required.entrySet()) {
-            int providedCount = provided.getOrDefault(entry.getKey(), 0);
-            if (providedCount < entry.getValue()) {
-                return false;
+            int need = entry.getValue();
+            int have = provided.getOrDefault(entry.getKey(), 0);
+            
+            if (need > 0) {
+                // 这种物品能恢复的方块数比例
+                int ratio = (have * record.getBlockCount()) / need;
+                canRestore = Math.min(canRestore, ratio);
             }
         }
         
-        return true;
+        return canRestore == Integer.MAX_VALUE ? 0 : canRestore;
     }
     
     /**
-     * 消耗容器中的物品并返还剩余部分
+     * 消耗容器中的物品并返还剩余部分（支持部分消耗）
      */
     public void consumeItemsAndReturnRest() {
         if (record == null || player == null || player.level().isClientSide) {
             return;
         }
-        
-        Map<Item, Integer> required = new HashMap<>(record.getRequiredItems());
         
         // 创造模式：返还所有物品，不消耗
         if (player.isCreative()) {
@@ -170,7 +209,33 @@ public class RewindMenu extends AbstractContainerMenu {
             return;
         }
         
-        // 生存模式：消耗需要的物品，返还剩余
+        // 生存模式：根据可恢复的方块数量计算需要消耗的物品
+        int restorableCount = getRestorableBlockCount();
+        int totalBlocks = record.getBlockCount();
+        
+        if (restorableCount <= 0) {
+            // 材料完全不足，返还所有物品
+            for (int i = 0; i < CONTAINER_SIZE; i++) {
+                ItemStack stack = container.removeItemNoUpdate(i);
+                if (!stack.isEmpty()) {
+                    player.getInventory().placeItemBackInInventory(stack);
+                }
+            }
+            return;
+        }
+        
+        // 计算每种物品需要消耗的数量（按比例）
+        Map<Item, Integer> originalRequired = record.getRequiredItems();
+        Map<Item, Integer> actualConsume = new HashMap<>();
+        
+        for (Map.Entry<Item, Integer> entry : originalRequired.entrySet()) {
+            int originalAmount = entry.getValue();
+            // 按比例计算实际消耗量
+            int consumeAmount = (originalAmount * restorableCount) / totalBlocks;
+            actualConsume.put(entry.getKey(), consumeAmount);
+        }
+        
+        // 消耗物品并返还剩余
         for (int i = 0; i < CONTAINER_SIZE; i++) {
             ItemStack stack = container.removeItemNoUpdate(i);
             
@@ -179,16 +244,13 @@ public class RewindMenu extends AbstractContainerMenu {
                 int count = stack.getCount();
                 
                 // 检查这个物品是否是需要的
-                if (required.containsKey(item)) {
-                    int needed = required.get(item);
+                if (actualConsume.containsKey(item) && actualConsume.get(item) > 0) {
+                    int needed = actualConsume.get(item);
                     int toConsume = Math.min(needed, count);
                     int toReturn = count - toConsume;
                     
                     // 更新需要的数量
-                    required.put(item, needed - toConsume);
-                    if (required.get(item) <= 0) {
-                        required.remove(item);
-                    }
+                    actualConsume.put(item, needed - toConsume);
                     
                     // 返还多余的部分
                     if (toReturn > 0) {
@@ -196,7 +258,7 @@ public class RewindMenu extends AbstractContainerMenu {
                         player.getInventory().placeItemBackInInventory(returnStack);
                     }
                 } else {
-                    // 不是需要的物品，全部返还
+                    // 不是需要的物品或已经消耗够了，全部返还
                     player.getInventory().placeItemBackInInventory(stack);
                 }
             }

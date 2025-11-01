@@ -39,7 +39,7 @@ public class OpenRewindScreenPacket {
             
             if (record == null) {
                 player.displayClientMessage(
-                    Component.literal("没有可撤销的连锁采集记录").withStyle(ChatFormatting.RED),
+                    Component.translatable("message.ultimine_rewind.no_record").withStyle(ChatFormatting.RED),
                     true
                 );
                 return;
@@ -49,7 +49,7 @@ public class OpenRewindScreenPacket {
             UltimineRecord finalRecord = record;
             player.openMenu(new SimpleMenuProvider(
                 (containerId, playerInventory, p) -> new RewindMenu(containerId, playerInventory, finalRecord),
-                Component.literal("连锁采集撤销")
+                Component.translatable("container.ultimine_rewind.rewind_menu")
             ));
             
             // 菜单打开后发送数据同步包到客户端

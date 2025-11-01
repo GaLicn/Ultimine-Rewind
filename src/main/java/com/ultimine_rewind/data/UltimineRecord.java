@@ -73,5 +73,21 @@ public class UltimineRecord {
     public int getBlockCount() {
         return blocks.size();
     }
+    
+    /**
+     * 移除已恢复的方块（从前往后移除指定数量）
+     * @param count 要移除的方块数量
+     * @return 新的记录（如果还有剩余方块），否则返回null
+     */
+    public UltimineRecord removeRestoredBlocks(int count) {
+        if (count >= blocks.size()) {
+            // 已经全部恢复，返回null
+            return null;
+        }
+        
+        // 创建新的记录，包含剩余的方块
+        List<BlockRecord> remainingBlocks = new ArrayList<>(blocks.subList(count, blocks.size()));
+        return new UltimineRecord(playerId, timestamp, remainingBlocks, centerPos);
+    }
 }
 

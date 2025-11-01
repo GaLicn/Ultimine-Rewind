@@ -50,7 +50,7 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
         
         // 确认按钮 - 靠右上
         this.confirmButton = Button.builder(
-            Component.literal("✓ 恢复方块"),
+            Component.translatable("gui.ultimine_rewind.button.restore"),
             btn -> onConfirmClicked()
         )
         .bounds(buttonX, this.topPos + 20, buttonWidth, 30)
@@ -59,7 +59,7 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
         
         // 取消按钮 - 确认按钮下方
         this.cancelButton = Button.builder(
-            Component.literal("✗ 取消"),
+            Component.translatable("gui.ultimine_rewind.button.cancel"),
             btn -> this.onClose()
         )
         .bounds(buttonX, this.topPos + 55, buttonWidth, 30)
@@ -84,24 +84,24 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
         boolean isCreative = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.isCreative();
         
         if (isCreative) {
-            requiredItemsText.add(Component.literal("创造模式").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-            requiredItemsText.add(Component.literal("无需材料即可恢复").withStyle(ChatFormatting.GREEN));
-            requiredItemsText.add(Component.literal("").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("点击 '恢复方块' 即可").withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_mode").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_no_materials").withStyle(ChatFormatting.GREEN));
+            requiredItemsText.add(Component.literal(""));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_click_restore").withStyle(ChatFormatting.GRAY));
         } else if (menu.hasData()) {
             Map<Item, Integer> required = menu.getRequiredItems();
             
-            requiredItemsText.add(Component.literal("需要的物品:").withStyle(ChatFormatting.BOLD));
-            requiredItemsText.add(Component.literal("共 " + required.size() + " 种材料").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("点击下方按钮查看详情").withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.required_items").withStyle(ChatFormatting.BOLD));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.material_count", required.size()).withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.click_for_details").withStyle(ChatFormatting.GRAY));
         } else {
             // 客户端没有record数据时的提示
-            requiredItemsText.add(Component.literal("撤销提示").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-            requiredItemsText.add(Component.literal("").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("将需要的方块").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("放入容器中").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal("创造模式无需材料").withStyle(ChatFormatting.GREEN));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.rewind_hint").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            requiredItemsText.add(Component.literal(""));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.place_blocks").withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.into_container").withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.literal(""));
+            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_no_cost").withStyle(ChatFormatting.GREEN));
         }
     }
     
@@ -127,7 +127,7 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
             guiGraphics.fill(panelX, panelY + panelHeight - 1, panelX + panelWidth, panelY + panelHeight, 0xFF555555);
             
             // 绘制标题
-            Component panelTitle = Component.literal("撤销信息").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD);
+            Component panelTitle = Component.translatable("gui.ultimine_rewind.panel_title").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD);
             int titleWidth = this.font.width(panelTitle);
             guiGraphics.drawString(this.font, panelTitle, panelX + (panelWidth - titleWidth) / 2, panelY + 8, 0xFFFFFF);
             
@@ -152,7 +152,9 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
             
             // 始终显示按钮
             detailsButton = Button.builder(
-                showDetails ? Component.literal("✖ 关闭详情") : Component.literal("📋 查看材料"),
+                showDetails ? 
+                    Component.translatable("gui.ultimine_rewind.button.close_details") : 
+                    Component.translatable("gui.ultimine_rewind.button.view_materials"),
                 btn -> toggleDetails()
             )
             .bounds(panelX + 5, buttonY, panelWidth - 10, buttonHeight)
@@ -188,11 +190,17 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
                     }
                 } else {
                     // 没有数据时显示提示
-                    guiGraphics.drawString(this.font, "材料信息", panelX + 10, detailY, 0xFFFFFF);
+                    guiGraphics.drawString(this.font, 
+                        Component.translatable("gui.ultimine_rewind.material_info").getString(), 
+                        panelX + 10, detailY, 0xFFFFFF);
                     detailY += 15;
-                    guiGraphics.drawString(this.font, "将在放入材料后", panelX + 10, detailY, 0xFF888888);
+                    guiGraphics.drawString(this.font, 
+                        Component.translatable("gui.ultimine_rewind.auto_display").getString(), 
+                        panelX + 10, detailY, 0xFF888888);
                     detailY += 12;
-                    guiGraphics.drawString(this.font, "自动显示", panelX + 10, detailY, 0xFF888888);
+                    guiGraphics.drawString(this.font, 
+                        Component.translatable("gui.ultimine_rewind.auto_display_2").getString(), 
+                        panelX + 10, detailY, 0xFF888888);
                 }
             }
         }

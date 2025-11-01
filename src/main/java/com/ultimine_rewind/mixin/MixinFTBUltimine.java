@@ -100,7 +100,7 @@ public abstract class MixinFTBUltimine {
             
             // 发送提示消息
             player.displayClientMessage(
-                Component.literal("已记录 " + ultimine_rewind$currentBlockRecords.size() + " 个方块，按 Ctrl+Z 可撤销")
+                Component.translatable("message.ultimine_rewind.recorded", ultimine_rewind$currentBlockRecords.size())
                     .withStyle(ChatFormatting.GRAY),
                 true
             );
