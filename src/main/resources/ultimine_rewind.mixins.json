@@ -2,9 +2,10 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.ultimine_rewind.mixin",
-  "compatibilityLevel": "JAVA_8",
+  "compatibilityLevel": "JAVA_17",
   "refmap": "ultimine_rewind.refmap.json",
   "mixins": [
+    "MixinFTBUltimine"
   ],
   "client": [
   ],

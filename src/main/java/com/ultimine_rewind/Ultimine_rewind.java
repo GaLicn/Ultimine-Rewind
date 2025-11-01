@@ -1,7 +1,11 @@
 package com.ultimine_rewind;
 
 import com.mojang.logging.LogUtils;
+import com.ultimine_rewind.client.screen.RewindScreen;
+import com.ultimine_rewind.init.ModMenuTypes;
+import com.ultimine_rewind.network.NetworkHandler;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
@@ -69,6 +73,9 @@ public class Ultimine_rewind {
         ITEMS.register(modEventBus);
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
+        
+        // Register menu types
+        ModMenuTypes.MENU_TYPES.register(modEventBus);
 
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
@@ -82,7 +89,7 @@ public class Ultimine_rewind {
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
+        LOGGER.info("Ultimine Rewind - Common Setup");
         LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
 
         if (Config.logDirtBlock) LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));
@@ -90,6 +97,9 @@ public class Ultimine_rewind {
         LOGGER.info(Config.magicNumberIntroduction + Config.magicNumber);
 
         Config.items.forEach((item) -> LOGGER.info("ITEM >> {}", item.toString()));
+        
+        // Register network packets
+        event.enqueueWork(NetworkHandler::register);
     }
 
     // Add the example block item to the building blocks tab
@@ -101,7 +111,7 @@ public class Ultimine_rewind {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         // Do something when the server starts
-        LOGGER.info("HELLO from server starting");
+        LOGGER.info("Ultimine Rewind - Server Starting");
     }
 
     // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
@@ -111,8 +121,13 @@ public class Ultimine_rewind {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             // Some client setup code
-            LOGGER.info("HELLO FROM CLIENT SETUP");
+            LOGGER.info("Ultimine Rewind - Client Setup");
             LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+            
+            // Register screen
+            event.enqueueWork(() -> {
+                MenuScreens.register(ModMenuTypes.REWIND_MENU.get(), RewindScreen::new);
+            });
         }
     }
 }
