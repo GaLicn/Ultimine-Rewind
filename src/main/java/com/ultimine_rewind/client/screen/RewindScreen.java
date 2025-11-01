@@ -27,9 +27,11 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
     
     private Button confirmButton;
     private Button cancelButton;
+    private Button detailsButton;
     private List<Component> requiredItemsText;
     
     private final int containerRows = 6;
+    private boolean showDetails = false;
     
     public RewindScreen(RewindMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -68,6 +70,13 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
         updateRequiredItemsText();
     }
     
+    /**
+     * 切换材料详情显示
+     */
+    private void toggleDetails() {
+        showDetails = !showDetails;
+    }
+    
     private void updateRequiredItemsText() {
         requiredItemsText = new ArrayList<>();
         
@@ -79,18 +88,12 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
             requiredItemsText.add(Component.literal("无需材料即可恢复").withStyle(ChatFormatting.GREEN));
             requiredItemsText.add(Component.literal("").withStyle(ChatFormatting.GRAY));
             requiredItemsText.add(Component.literal("点击 '恢复方块' 即可").withStyle(ChatFormatting.GRAY));
-        } else if (menu.record != null) {
-            Map<Item, Integer> required = menu.record.getRequiredItems();
+        } else if (menu.hasData()) {
+            Map<Item, Integer> required = menu.getRequiredItems();
             
             requiredItemsText.add(Component.literal("需要的物品:").withStyle(ChatFormatting.BOLD));
-            for (Map.Entry<Item, Integer> entry : required.entrySet()) {
-                Component itemName = entry.getKey().getDescription();
-                requiredItemsText.add(
-                    Component.literal("  • ")
-                        .append(itemName)
-                        .append(" x" + entry.getValue())
-                );
-            }
+            requiredItemsText.add(Component.literal("共 " + required.size() + " 种材料").withStyle(ChatFormatting.GRAY));
+            requiredItemsText.add(Component.literal("点击下方按钮查看详情").withStyle(ChatFormatting.GRAY));
         } else {
             // 客户端没有record数据时的提示
             requiredItemsText.add(Component.literal("撤销提示").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
@@ -136,6 +139,61 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
             for (Component text : requiredItemsText) {
                 guiGraphics.drawString(this.font, text, panelX + 8, textY, 0xFFFFFF);
                 textY += 12;
+            }
+            
+            // 绘制材料详情按钮（在文本下方）
+            int buttonY = textY + 10;
+            int buttonHeight = 20;
+            
+            // 移除旧按钮
+            if (detailsButton != null) {
+                this.removeWidget(detailsButton);
+            }
+            
+            // 始终显示按钮
+            detailsButton = Button.builder(
+                showDetails ? Component.literal("✖ 关闭详情") : Component.literal("📋 查看材料"),
+                btn -> toggleDetails()
+            )
+            .bounds(panelX + 5, buttonY, panelWidth - 10, buttonHeight)
+            .build();
+            this.addRenderableWidget(detailsButton);
+            
+            // 如果显示详情，绘制物品列表
+            if (showDetails) {
+                int detailY = buttonY + buttonHeight + 10;
+                
+                // 绘制分隔线
+                guiGraphics.fill(panelX + 5, detailY - 5, panelX + panelWidth - 5, detailY - 4, 0xFF888888);
+                
+                // 检查是否有数据
+                if (menu.hasData()) {
+                    Map<Item, Integer> required = menu.getRequiredItems();
+                    for (Map.Entry<Item, Integer> entry : required.entrySet()) {
+                        // 绘制物品图标
+                        guiGraphics.renderItem(new net.minecraft.world.item.ItemStack(entry.getKey()), panelX + 10, detailY);
+                        
+                        // 绘制物品名称和数量
+                        Component itemName = entry.getKey().getDescription();
+                        String text = itemName.getString() + " x" + entry.getValue();
+                        guiGraphics.drawString(this.font, text, panelX + 30, detailY + 4, 0xFFFFFF);
+                        
+                        detailY += 20;
+                        
+                        // 防止超出面板范围
+                        if (detailY > panelY + panelHeight - 10) {
+                            guiGraphics.drawString(this.font, "...", panelX + 10, detailY, 0xFF888888);
+                            break;
+                        }
+                    }
+                } else {
+                    // 没有数据时显示提示
+                    guiGraphics.drawString(this.font, "材料信息", panelX + 10, detailY, 0xFFFFFF);
+                    detailY += 15;
+                    guiGraphics.drawString(this.font, "将在放入材料后", panelX + 10, detailY, 0xFF888888);
+                    detailY += 12;
+                    guiGraphics.drawString(this.font, "自动显示", panelX + 10, detailY, 0xFF888888);
+                }
             }
         }
         

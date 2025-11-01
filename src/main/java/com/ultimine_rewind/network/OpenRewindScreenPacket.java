@@ -45,11 +45,21 @@ public class OpenRewindScreenPacket {
                 return;
             }
             
-            // 打开容器界面
+            // 打开容器界面并发送同步数据
+            UltimineRecord finalRecord = record;
             player.openMenu(new SimpleMenuProvider(
-                (containerId, playerInventory, p) -> new RewindMenu(containerId, playerInventory, record),
+                (containerId, playerInventory, p) -> new RewindMenu(containerId, playerInventory, finalRecord),
                 Component.literal("连锁采集撤销")
             ));
+            
+            // 菜单打开后发送数据同步包到客户端
+            if (record != null) {
+                NetworkHandler.INSTANCE.sendTo(
+                    new SyncRecordPacket(record),
+                    player.connection.connection,
+                    net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT
+                );
+            }
         });
         context.setPacketHandled(true);
     }

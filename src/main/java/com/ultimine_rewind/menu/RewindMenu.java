@@ -23,6 +23,10 @@ public class RewindMenu extends AbstractContainerMenu {
     private final Container container;
     private final Player player;
     
+    // 客户端缓存的数据
+    private Map<Item, Integer> clientRequiredItems;
+    private int clientBlockCount;
+    
     // 容器大小 (6行x6列 = 36格)
     private static final int CONTAINER_SIZE = 36;
     private static final int CONTAINER_ROWS = 6;
@@ -60,6 +64,54 @@ public class RewindMenu extends AbstractContainerMenu {
     // 构造函数 - 客户端使用
     public RewindMenu(int containerId, Inventory playerInventory) {
         this(containerId, playerInventory, null);
+        this.clientRequiredItems = new HashMap<>();
+        this.clientBlockCount = 0;
+    }
+    
+    /**
+     * 设置客户端数据（由网络包调用）
+     */
+    public void setClientRecordData(Map<Item, Integer> requiredItems, int blockCount) {
+        this.clientRequiredItems = new HashMap<>(requiredItems);
+        this.clientBlockCount = blockCount;
+        
+        // 调试日志
+        System.out.println("[Ultimine Rewind] 菜单设置客户端数据: " + 
+            this.clientRequiredItems.size() + " 种物品");
+        for (Map.Entry<Item, Integer> entry : this.clientRequiredItems.entrySet()) {
+            System.out.println("  - " + entry.getKey().getDescription().getString() + " x" + entry.getValue());
+        }
+    }
+    
+    /**
+     * 获取需要的物品（兼容客户端和服务端）
+     */
+    public Map<Item, Integer> getRequiredItems() {
+        if (record != null) {
+            return record.getRequiredItems();
+        }
+        return clientRequiredItems != null ? clientRequiredItems : new HashMap<>();
+    }
+    
+    /**
+     * 获取方块数量（兼容客户端和服务端）
+     */
+    public int getBlockCount() {
+        if (record != null) {
+            return record.getBlockCount();
+        }
+        return clientBlockCount;
+    }
+    
+    /**
+     * 检查是否有数据
+     */
+    public boolean hasData() {
+        if (record != null) {
+            Map<Item, Integer> items = record.getRequiredItems();
+            return items != null && !items.isEmpty();
+        }
+        return clientRequiredItems != null && !clientRequiredItems.isEmpty();
     }
     
     /**

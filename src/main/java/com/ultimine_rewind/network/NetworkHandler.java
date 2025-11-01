@@ -39,6 +39,14 @@ public class NetworkHandler {
                 ConfirmRewindPacket::decode,
                 ConfirmRewindPacket::handle
         );
+        
+        INSTANCE.registerMessage(
+                id(),
+                SyncRecordPacket.class,
+                SyncRecordPacket::encode,
+                SyncRecordPacket::decode,
+                SyncRecordPacket::handle
+        );
     }
 }
 
