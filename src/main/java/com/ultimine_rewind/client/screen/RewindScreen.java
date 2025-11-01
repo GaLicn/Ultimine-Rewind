@@ -30,7 +30,7 @@ public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
     private Button detailsButton;
     private List<Component> requiredItemsText;
     
-    private final int containerRows = 6;
+    private final int containerRows = 6; // 6行x9列，原版大箱子
     private boolean showDetails = false;
     
     public RewindScreen(RewindMenu menu, Inventory playerInventory, Component title) {

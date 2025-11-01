@@ -27,10 +27,10 @@ public class RewindMenu extends AbstractContainerMenu {
     private Map<Item, Integer> clientRequiredItems;
     private int clientBlockCount;
     
-    // 容器大小 (6行x6列 = 36格)
-    private static final int CONTAINER_SIZE = 36;
+    // 容器大小 (6行x9列 = 54格，与原版大箱子一致)
+    private static final int CONTAINER_SIZE = 54;
     private static final int CONTAINER_ROWS = 6;
-    private static final int CONTAINER_COLS = 6;
+    private static final int CONTAINER_COLS = 9;
     
     // 构造函数 - 服务端使用
     public RewindMenu(int containerId, Inventory playerInventory, UltimineRecord record) {
@@ -39,7 +39,7 @@ public class RewindMenu extends AbstractContainerMenu {
         this.player = playerInventory.player;
         this.container = new SimpleContainer(CONTAINER_SIZE);
         
-        // 添加容器槽位 (6行x6列)
+        // 添加容器槽位 (6行x9列，与原版大箱子一致)
         for (int row = 0; row < CONTAINER_ROWS; row++) {
             for (int col = 0; col < CONTAINER_COLS; col++) {
                 this.addSlot(new Slot(container, row * CONTAINER_COLS + col, 
@@ -47,17 +47,19 @@ public class RewindMenu extends AbstractContainerMenu {
             }
         }
         
-        // 添加玩家背包槽位 (3行)
+        // 添加玩家背包槽位 (3行) - Y坐标需要根据容器行数调整
+        int inventoryY = 18 + CONTAINER_ROWS * 18 + 14; // 容器底部 + 间隔
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 this.addSlot(new Slot(playerInventory, 
-                    col + row * 9 + 9, 8 + col * 18, 140 + row * 18));
+                    col + row * 9 + 9, 8 + col * 18, inventoryY + row * 18));
             }
         }
         
         // 添加玩家快捷栏槽位
+        int hotbarY = inventoryY + 58; // 背包下方 + 间隔
         for (int col = 0; col < 9; col++) {
-            this.addSlot(new Slot(playerInventory, col, 8 + col * 18, 198));
+            this.addSlot(new Slot(playerInventory, col, 8 + col * 18, hotbarY));
         }
     }
     
