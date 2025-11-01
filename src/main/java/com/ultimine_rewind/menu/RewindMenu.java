@@ -150,35 +150,54 @@ public class RewindMenu extends AbstractContainerMenu {
     }
     
     /**
-     * 消耗容器中的物品
+     * 消耗容器中的物品并返还剩余部分
      */
-    public void consumeItems() {
-        if (record == null) {
-            return;
-        }
-        
-        // 创造模式玩家无需消耗物品
-        if (player != null && player.isCreative()) {
+    public void consumeItemsAndReturnRest() {
+        if (record == null || player == null || player.level().isClientSide) {
             return;
         }
         
         Map<Item, Integer> required = new HashMap<>(record.getRequiredItems());
         
-        for (int i = 0; i < CONTAINER_SIZE; i++) {
-            ItemStack stack = this.getSlot(i).getItem();
-            if (!stack.isEmpty() && required.containsKey(stack.getItem())) {
-                int needed = required.get(stack.getItem());
-                int toRemove = Math.min(needed, stack.getCount());
-                
-                stack.shrink(toRemove);
-                required.put(stack.getItem(), needed - toRemove);
-                
-                if (required.get(stack.getItem()) <= 0) {
-                    required.remove(stack.getItem());
+        // 创造模式：返还所有物品，不消耗
+        if (player.isCreative()) {
+            for (int i = 0; i < CONTAINER_SIZE; i++) {
+                ItemStack stack = container.removeItemNoUpdate(i);
+                if (!stack.isEmpty()) {
+                    player.getInventory().placeItemBackInInventory(stack);
                 }
+            }
+            return;
+        }
+        
+        // 生存模式：消耗需要的物品，返还剩余
+        for (int i = 0; i < CONTAINER_SIZE; i++) {
+            ItemStack stack = container.removeItemNoUpdate(i);
+            
+            if (!stack.isEmpty()) {
+                Item item = stack.getItem();
+                int count = stack.getCount();
                 
-                if (required.isEmpty()) {
-                    break;
+                // 检查这个物品是否是需要的
+                if (required.containsKey(item)) {
+                    int needed = required.get(item);
+                    int toConsume = Math.min(needed, count);
+                    int toReturn = count - toConsume;
+                    
+                    // 更新需要的数量
+                    required.put(item, needed - toConsume);
+                    if (required.get(item) <= 0) {
+                        required.remove(item);
+                    }
+                    
+                    // 返还多余的部分
+                    if (toReturn > 0) {
+                        ItemStack returnStack = new ItemStack(item, toReturn);
+                        player.getInventory().placeItemBackInInventory(returnStack);
+                    }
+                } else {
+                    // 不是需要的物品，全部返还
+                    player.getInventory().placeItemBackInInventory(stack);
                 }
             }
         }

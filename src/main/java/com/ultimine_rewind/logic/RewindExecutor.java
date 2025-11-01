@@ -67,8 +67,8 @@ public class RewindExecutor {
             }
         }
         
-        // 3. 消耗物品（创造模式不消耗）
-        menu.consumeItems();
+        // 3. 消耗物品并返还剩余物品（创造模式不消耗）
+        menu.consumeItemsAndReturnRest();
         
         // 4. 恢复所有方块
         int restoredCount = 0;
