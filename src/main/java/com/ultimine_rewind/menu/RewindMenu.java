@@ -76,13 +76,6 @@ public class RewindMenu extends AbstractContainerMenu {
     public void setClientRecordData(Map<Item, Integer> requiredItems, int blockCount) {
         this.clientRequiredItems = new HashMap<>(requiredItems);
         this.clientBlockCount = blockCount;
-        
-        // 调试日志
-        System.out.println("[Ultimine Rewind] 菜单设置客户端数据: " + 
-            this.clientRequiredItems.size() + " 种物品");
-        for (Map.Entry<Item, Integer> entry : this.clientRequiredItems.entrySet()) {
-            System.out.println("  - " + entry.getKey().getDescription().getString() + " x" + entry.getValue());
-        }
     }
     
     /**
@@ -194,8 +187,9 @@ public class RewindMenu extends AbstractContainerMenu {
     
     /**
      * 消耗容器中的物品并返还剩余部分（支持部分消耗）
+     * @param actualRestoredCount 实际恢复的方块数量
      */
-    public void consumeItemsAndReturnRest() {
+    public void consumeItemsAndReturnRest(int actualRestoredCount) {
         if (record == null || player == null || player.level().isClientSide) {
             return;
         }
@@ -211,8 +205,8 @@ public class RewindMenu extends AbstractContainerMenu {
             return;
         }
         
-        // 生存模式：根据可恢复的方块数量计算需要消耗的物品
-        int restorableCount = getRestorableBlockCount();
+        // 生存模式：根据实际恢复的方块数量计算需要消耗的物品
+        int restorableCount = actualRestoredCount;
         int totalBlocks = record.getBlockCount();
         
         if (restorableCount <= 0) {
@@ -246,22 +240,29 @@ public class RewindMenu extends AbstractContainerMenu {
                 int count = stack.getCount();
                 
                 // 检查这个物品是否是需要的
-                if (actualConsume.containsKey(item) && actualConsume.get(item) > 0) {
-                    int needed = actualConsume.get(item);
-                    int toConsume = Math.min(needed, count);
+                Integer remainingNeed = actualConsume.get(item);
+                if (remainingNeed != null && remainingNeed > 0) {
+                    // 需要消耗这个物品
+                    int toConsume = Math.min(remainingNeed, count);
                     int toReturn = count - toConsume;
                     
-                    // 更新需要的数量
-                    actualConsume.put(item, needed - toConsume);
+                    // 更新剩余需要的数量
+                    actualConsume.put(item, remainingNeed - toConsume);
                     
                     // 返还多余的部分
                     if (toReturn > 0) {
                         ItemStack returnStack = new ItemStack(item, toReturn);
-                        player.getInventory().placeItemBackInInventory(returnStack);
+                        if (!player.getInventory().add(returnStack)) {
+                            // 背包满了，掉落物品
+                            player.drop(returnStack, false);
+                        }
                     }
                 } else {
-                    // 不是需要的物品或已经消耗够了，全部返还
-                    player.getInventory().placeItemBackInInventory(stack);
+                    // 不需要这个物品，或者已经消耗够了，全部返还
+                    if (!player.getInventory().add(stack)) {
+                        // 背包满了，掉落物品
+                        player.drop(stack, false);
+                    }
                 }
             }
         }
@@ -318,4 +319,3 @@ public class RewindMenu extends AbstractContainerMenu {
         }
     }
 }
-

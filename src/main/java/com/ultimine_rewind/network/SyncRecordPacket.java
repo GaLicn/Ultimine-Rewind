@@ -65,10 +65,6 @@ public class SyncRecordPacket {
             if (minecraft.player != null && minecraft.player.containerMenu instanceof RewindMenu menu) {
                 // 将数据设置到菜单中
                 menu.setClientRecordData(packet.requiredItems, packet.blockCount);
-                
-                // 调试日志
-                System.out.println("[Ultimine Rewind] 客户端接收到数据: " + 
-                    packet.requiredItems.size() + " 种物品, " + packet.blockCount + " 个方块");
             }
         });
         context.setPacketHandled(true);

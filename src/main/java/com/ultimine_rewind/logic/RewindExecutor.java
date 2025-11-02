@@ -10,7 +10,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -75,7 +74,7 @@ public class RewindExecutor {
             }
         }
         
-        // 4. 恢复方块
+        // 4. 恢复方块（不恢复NBT数据，防止物品刷取漏洞）
         int restoredCount = 0;
         for (BlockRecord blockRecord : blocksToProcess) {
             BlockPos pos = blockRecord.getPos();
@@ -92,23 +91,14 @@ public class RewindExecutor {
                 continue;
             }
             
-            // 放置方块
+            // 放置方块（仅恢复方块本身，不恢复NBT数据）
             level.setBlock(pos, state, Block.UPDATE_ALL | Block.UPDATE_CLIENTS);
-            
-            // 恢复方块实体数据
-            if (blockRecord.getBlockEntityData() != null) {
-                BlockEntity blockEntity = level.getBlockEntity(pos);
-                if (blockEntity != null) {
-                    blockEntity.load(blockRecord.getBlockEntityData());
-                    blockEntity.setChanged();
-                }
-            }
             
             restoredCount++;
         }
         
-        // 5. 消耗物品并返还剩余物品（在恢复完成后）
-        menu.consumeItemsAndReturnRest();
+        // 5. 消耗物品并返还剩余物品（在恢复完成后，传入实际恢复的数量）
+        menu.consumeItemsAndReturnRest(restoredCount);
         
         // 6. 更新或清除记录
         int totalBlocks = record.getBlockCount();
