@@ -91,11 +91,14 @@ public class RewindExecutor {
                 continue;
             }
             
-            // 放置方块（仅恢复方块本身，不恢复NBT数据）
+            // 放置方块（仅恢复方块本身，不恢复NBT数据，防止刷物品）
             level.setBlock(pos, state, Block.UPDATE_ALL | Block.UPDATE_CLIENTS);
             
             restoredCount++;
         }
+        
+        // 注意：此实现不会恢复方块实体数据（如箱子中的物品）
+        // 这是为了防止刷物品漏洞
         
         // 5. 消耗物品并返还剩余物品（在恢复完成后，传入实际恢复的数量）
         menu.consumeItemsAndReturnRest(restoredCount);
