@@ -122,11 +122,16 @@ public abstract class MixinFTBUltimine {
         // 获取方块状态
         BlockState blockState = level.getBlockState(pos);
         
-        // 不记录方块实体数据，防止刷物品漏洞
-        // 例如：箱子、熔炉等容器的物品不会被恢复
+        // 获取方块实体数据（如果存在）
+        // 注意：生存模式下不会使用此数据，只有创造模式才会恢复
+        CompoundTag beData = null;
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity != null) {
+            beData = blockEntity.saveWithFullMetadata();
+        }
         
-        // 记录方块信息（NBT数据为null）
-        BlockRecord record = new BlockRecord(pos, blockState, null);
+        // 记录方块信息（包含NBT数据，由恢复器决定是否使用）
+        BlockRecord record = new BlockRecord(pos, blockState, beData);
         ultimine_rewind$currentBlockRecords.add(record);
     }
 }
