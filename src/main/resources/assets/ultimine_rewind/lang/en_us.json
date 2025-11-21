@@ -1,0 +1,38 @@
+{
+  "key.categories.ultimine_rewind": "Ultimine Rewind",
+  "key.ultimine_rewind.rewind": "Rewind Ultimine",
+  "container.ultimine_rewind.rewind_menu": "Ultimine Rewind",
+  
+  "gui.ultimine_rewind.panel_title": "Rewind Info",
+  "gui.ultimine_rewind.creative_mode": "Creative Mode",
+  "gui.ultimine_rewind.creative_no_materials": "No materials needed",
+  "gui.ultimine_rewind.creative_click_restore": "Click 'Restore Blocks' to proceed",
+  "gui.ultimine_rewind.required_items": "Required Items:",
+  "gui.ultimine_rewind.material_count": "%s types of materials",
+  "gui.ultimine_rewind.click_for_details": "Click button below for details",
+  "gui.ultimine_rewind.rewind_hint": "Rewind Hint",
+  "gui.ultimine_rewind.place_blocks": "Place required blocks",
+  "gui.ultimine_rewind.into_container": "into the container",
+  "gui.ultimine_rewind.creative_no_cost": "No cost in creative mode",
+  
+  "gui.ultimine_rewind.button.restore": "✓ Restore Blocks",
+  "gui.ultimine_rewind.button.cancel": "✗ Cancel",
+  "gui.ultimine_rewind.button.view_materials": "📋 View Materials",
+  "gui.ultimine_rewind.button.close_details": "✖ Close Details",
+  
+  "gui.ultimine_rewind.material_info": "Material Info",
+  "gui.ultimine_rewind.auto_display": "Will be displayed",
+  "gui.ultimine_rewind.auto_display_2": "after adding materials",
+  
+  "message.ultimine_rewind.recorded": "Recorded %s blocks, press Ctrl+Z to rewind",
+  "message.ultimine_rewind.no_record": "No rewind record available",
+  "message.ultimine_rewind.no_materials": "No valid materials in container",
+  "message.ultimine_rewind.insufficient_materials": "Insufficient materials, cannot restore any blocks",
+  "message.ultimine_rewind.chunk_not_loaded": "Some chunks not loaded, partial restoration failed",
+  "message.ultimine_rewind.position_occupied": "Some positions occupied, cannot restore",
+  "message.ultimine_rewind.partial_restore": "Partial restore: %s/%s blocks restored",
+  "message.ultimine_rewind.remaining": "%s blocks remaining (press Ctrl+Z to continue)",
+  "message.ultimine_rewind.success": "Successfully restored %s blocks",
+  "message.ultimine_rewind.success_creative": "Successfully restored %s blocks (Creative Mode)"
+}
+

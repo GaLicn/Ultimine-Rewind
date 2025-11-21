@@ -1,0 +1,38 @@
+{
+  "key.categories.ultimine_rewind": "Ultimine Rewind",
+  "key.ultimine_rewind.rewind": "撤销连锁采集",
+  "container.ultimine_rewind.rewind_menu": "连锁采集撤销",
+  
+  "gui.ultimine_rewind.panel_title": "撤销信息",
+  "gui.ultimine_rewind.creative_mode": "创造模式",
+  "gui.ultimine_rewind.creative_no_materials": "无需材料即可恢复",
+  "gui.ultimine_rewind.creative_click_restore": "点击 '恢复方块' 即可",
+  "gui.ultimine_rewind.required_items": "需要的物品:",
+  "gui.ultimine_rewind.material_count": "共 %s 种材料",
+  "gui.ultimine_rewind.click_for_details": "点击下方按钮查看详情",
+  "gui.ultimine_rewind.rewind_hint": "撤销提示",
+  "gui.ultimine_rewind.place_blocks": "将需要的方块",
+  "gui.ultimine_rewind.into_container": "放入容器中",
+  "gui.ultimine_rewind.creative_no_cost": "创造模式无需材料",
+  
+  "gui.ultimine_rewind.button.restore": "✓ 恢复方块",
+  "gui.ultimine_rewind.button.cancel": "✗ 取消",
+  "gui.ultimine_rewind.button.view_materials": "📋 查看材料",
+  "gui.ultimine_rewind.button.close_details": "✖ 关闭详情",
+  
+  "gui.ultimine_rewind.material_info": "材料信息",
+  "gui.ultimine_rewind.auto_display": "将在放入材料后",
+  "gui.ultimine_rewind.auto_display_2": "自动显示",
+  
+  "message.ultimine_rewind.recorded": "已记录 %s 个方块，按 Ctrl+Z 可撤销",
+  "message.ultimine_rewind.no_record": "没有可撤销的连锁采集记录",
+  "message.ultimine_rewind.no_materials": "容器中没有可用的材料",
+  "message.ultimine_rewind.insufficient_materials": "材料不足，无法恢复任何方块",
+  "message.ultimine_rewind.chunk_not_loaded": "某些区块未加载，部分方块无法恢复",
+  "message.ultimine_rewind.position_occupied": "某些位置已被占用，无法恢复",
+  "message.ultimine_rewind.partial_restore": "部分恢复：已恢复 %s/%s 个方块",
+  "message.ultimine_rewind.remaining": "还有 %s 个方块可继续恢复（按 Ctrl+Z）",
+  "message.ultimine_rewind.success": "成功恢复 %s 个方块",
+  "message.ultimine_rewind.success_creative": "成功恢复 %s 个方块（创造模式）"
+}
+
