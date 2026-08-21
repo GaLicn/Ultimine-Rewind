@@ -4,6 +4,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,20 +16,25 @@ import java.util.UUID;
  * 管理所有玩家的连锁采集记录
  */
 public class RewindDataManager {
-    // 每个玩家只保存最后一次连锁采集记录
-    private static final Map<UUID, UltimineRecord> playerRecords = new HashMap<>();
+    private static final int MAX_RECORDS = 5;
+    private static final Map<UUID, Deque<UltimineRecord>> playerRecords = new HashMap<>();
     
     /**
      * 记录一次连锁采集
      */
-    public static void recordUltimine(ServerPlayer player, List<BlockRecord> blocks, BlockPos centerPos) {
+    public static synchronized void recordUltimine(ServerPlayer player, List<BlockRecord> blocks, BlockPos centerPos) {
         if (blocks == null || blocks.isEmpty()) {
             return;
         }
         
         UUID playerId = player.getUUID();
-        UltimineRecord record = new UltimineRecord(playerId, System.currentTimeMillis(), blocks, centerPos);
-        playerRecords.put(playerId, record);
+        Deque<UltimineRecord> records = playerRecords.computeIfAbsent(playerId, ignored -> new ArrayDeque<>());
+        records.removeIf(UltimineRecord::isExpired);
+        records.addLast(new UltimineRecord(playerId, System.currentTimeMillis(), blocks, centerPos));
+        // 仅保留最近五次记录。
+        while (records.size() > MAX_RECORDS) {
+            records.removeFirst();
+        }
     }
     
     /**
@@ -35,20 +42,24 @@ public class RewindDataManager {
      * @return 记录，如果不存在或已过期则返回null
      */
     @Nullable
-    public static UltimineRecord getRecord(UUID playerId) {
-        UltimineRecord record = playerRecords.get(playerId);
-        if (record != null && record.isExpired()) {
+    public static synchronized UltimineRecord getRecord(UUID playerId) {
+        Deque<UltimineRecord> records = playerRecords.get(playerId);
+        if (records == null) {
+            return null;
+        }
+        records.removeIf(UltimineRecord::isExpired);
+        if (records.isEmpty()) {
             playerRecords.remove(playerId);
             return null;
         }
-        return record;
+        return records.peekLast();
     }
     
     /**
      * 清除玩家的撤销记录
      */
-    public static void clearRecord(UUID playerId) {
-        playerRecords.remove(playerId);
+    public static synchronized void clearRecord(UUID playerId) {
+        updateRecord(playerId, null);
     }
     
     /**
@@ -56,19 +67,30 @@ public class RewindDataManager {
      * @param playerId 玩家ID
      * @param newRecord 新的记录（如果为null则清除记录）
      */
-    public static void updateRecord(UUID playerId, UltimineRecord newRecord) {
-        if (newRecord == null || newRecord.getBlocks().isEmpty()) {
+    public static synchronized void updateRecord(UUID playerId, UltimineRecord newRecord) {
+        Deque<UltimineRecord> records = playerRecords.get(playerId);
+        if (records == null) {
+            return;
+        }
+        if (!records.isEmpty()) {
+            records.removeLast();
+        }
+        if (newRecord != null && !newRecord.getBlocks().isEmpty()) {
+            records.addLast(newRecord);
+        }
+        if (records.isEmpty()) {
             playerRecords.remove(playerId);
-        } else {
-            playerRecords.put(playerId, newRecord);
         }
     }
     
     /**
      * 清除所有过期的记录
      */
-    public static void cleanupExpiredRecords() {
-        playerRecords.entrySet().removeIf(entry -> entry.getValue().isExpired());
+    public static synchronized void cleanupExpiredRecords() {
+        playerRecords.entrySet().removeIf(entry -> {
+            entry.getValue().removeIf(UltimineRecord::isExpired);
+            return entry.getValue().isEmpty();
+        });
     }
     
     /**
@@ -78,4 +100,3 @@ public class RewindDataManager {
         return getRecord(playerId) != null;
     }
 }
-

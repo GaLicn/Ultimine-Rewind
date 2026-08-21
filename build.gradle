@@ -132,7 +132,12 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
     maven {
-        url "https://cursemaven.com"
+        name = 'ftb-maven'
+        url = 'https://maven.ftb.dev/releases'
+    }
+    maven {
+        name = 'architectury'
+        url = 'https://maven.architectury.dev/'
     }
 }
 
@@ -159,9 +164,9 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
-    implementation fg.deobf("curse.maven:ftb-ultimine-forge-386134:6899418")
-    implementation fg.deobf("curse.maven:architectury-api-419699:5137938")
-    implementation fg.deobf("curse.maven:ftb-library-forge-404465:6807424")
+    implementation fg.deobf("dev.ftb.mods:ftb-ultimine-forge:2001.1.7")
+    implementation fg.deobf("dev.architectury:architectury-forge:9.0.8")
+    implementation fg.deobf("dev.ftb.mods:ftb-library-forge:2001.2.1")
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 

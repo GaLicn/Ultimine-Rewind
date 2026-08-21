@@ -12,10 +12,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -53,6 +55,7 @@ public abstract class MixinFTBUltimine {
         at = @At(
             value = "FIELD",
             target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+            opcode = Opcodes.PUTFIELD,
             ordinal = 0,
             shift = At.Shift.BEFORE
         ),
@@ -87,6 +90,7 @@ public abstract class MixinFTBUltimine {
         at = @At(
             value = "FIELD",
             target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+            opcode = Opcodes.PUTFIELD,
             ordinal = 1,
             shift = At.Shift.AFTER
         ),
@@ -94,7 +98,10 @@ public abstract class MixinFTBUltimine {
     )
     private void ultimine_rewind$onUltimineEnd(Level world, BlockPos origPos, BlockState state,
                                 ServerPlayer player, @Nullable IntValue xp, CallbackInfoReturnable<EventResult> cir) {
-        // 连锁结束，保存记录
+        // 只保留实际被破坏的位置，避免中途失败产生错误记录。
+        if (ultimine_rewind$currentBlockRecords != null && !ultimine_rewind$currentBlockRecords.isEmpty()) {
+            ultimine_rewind$currentBlockRecords.removeIf(record -> !world.getBlockState(record.getPos()).isAir());
+        }
         if (ultimine_rewind$currentBlockRecords != null && !ultimine_rewind$currentBlockRecords.isEmpty()) {
             RewindDataManager.recordUltimine(player, ultimine_rewind$currentBlockRecords, ultimine_rewind$currentCenterPos);
             
@@ -130,9 +137,9 @@ public abstract class MixinFTBUltimine {
             beData = blockEntity.saveWithFullMetadata();
         }
         
-        // 记录方块信息（包含NBT数据，由恢复器决定是否使用）
-        BlockRecord record = new BlockRecord(pos, blockState, beData);
+        // 使用克隆物品栈保留模组方块及其数据。
+        ItemStack requiredItem = blockState.getBlock().getCloneItemStack(level, pos, blockState);
+        BlockRecord record = new BlockRecord(pos, blockState, requiredItem, beData);
         ultimine_rewind$currentBlockRecords.add(record);
     }
 }
-

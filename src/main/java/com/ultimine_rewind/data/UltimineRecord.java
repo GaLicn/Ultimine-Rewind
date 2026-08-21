@@ -1,10 +1,12 @@
 package com.ultimine_rewind.data;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * 单次连锁采集的记录
@@ -41,15 +43,30 @@ public class UltimineRecord {
     /**
      * 获取所有需要的物品 (合并相同物品)
      */
-    public Map<Item, Integer> getRequiredItems() {
-        Map<Item, Integer> items = new HashMap<>();
+    public List<MaterialRequirement> requiredMaterials() {
+        List<MaterialRequirement> materials = new ArrayList<>();
         for (BlockRecord record : blocks) {
             ItemStack stack = record.getRequiredItem();
             if (!stack.isEmpty()) {
-                items.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                int index = findMaterial(materials, stack);
+                if (index < 0) {
+                    materials.add(new MaterialRequirement(stack, 1));
+                } else {
+                    MaterialRequirement material = materials.get(index);
+                    materials.set(index, new MaterialRequirement(material.stack(), material.count() + 1));
+                }
             }
         }
-        return items;
+        return List.copyOf(materials);
+    }
+
+    private static int findMaterial(List<MaterialRequirement> materials, ItemStack stack) {
+        for (int index = 0; index < materials.size(); index++) {
+            if (ItemStack.isSameItemSameTags(materials.get(index).stack(), stack)) {
+                return index;
+            }
+        }
+        return -1;
     }
     
     /**
@@ -79,15 +96,9 @@ public class UltimineRecord {
      * @param count 要移除的方块数量
      * @return 新的记录（如果还有剩余方块），否则返回null
      */
-    public UltimineRecord removeRestoredBlocks(int count) {
-        if (count >= blocks.size()) {
-            // 已经全部恢复，返回null
-            return null;
-        }
-        
-        // 创建新的记录，包含剩余的方块
-        List<BlockRecord> remainingBlocks = new ArrayList<>(blocks.subList(count, blocks.size()));
-        return new UltimineRecord(playerId, timestamp, remainingBlocks, centerPos);
+    public UltimineRecord withoutRestored(List<BlockRecord> restored) {
+        List<BlockRecord> remainingBlocks = new ArrayList<>(blocks);
+        remainingBlocks.removeAll(restored);
+        return remainingBlocks.isEmpty() ? null : new UltimineRecord(playerId, timestamp, remainingBlocks, centerPos);
     }
 }
-

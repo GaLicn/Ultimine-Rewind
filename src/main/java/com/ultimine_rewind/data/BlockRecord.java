@@ -13,11 +13,14 @@ import org.jetbrains.annotations.Nullable;
 public class BlockRecord {
     private final BlockPos pos;              // 方块位置
     private final BlockState state;          // 方块状态
+    private final ItemStack requiredItem;       // 恢复所需物品
     private final CompoundTag blockEntityData; // 方块实体数据（仅创造模式恢复）
     
-    public BlockRecord(BlockPos pos, BlockState state, @Nullable CompoundTag beData) {
+    public BlockRecord(BlockPos pos, BlockState state, ItemStack requiredItem, @Nullable CompoundTag beData) {
         this.pos = pos.immutable();
         this.state = state;
+        this.requiredItem = requiredItem.copy();
+        this.requiredItem.setCount(1);
         this.blockEntityData = beData; // 保存NBT数据
     }
     
@@ -42,7 +45,6 @@ public class BlockRecord {
      * 获取恢复此方块需要的物品
      */
     public ItemStack getRequiredItem() {
-        return new ItemStack(state.getBlock().asItem());
+        return requiredItem.copy();
     }
 }
-
