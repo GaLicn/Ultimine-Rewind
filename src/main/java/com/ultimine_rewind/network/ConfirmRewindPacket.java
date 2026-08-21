@@ -1,42 +1,31 @@
 package com.ultimine_rewind.network;
 
+import com.ultimine_rewind.UltimineRewind;
 import com.ultimine_rewind.logic.RewindExecutor;
 import com.ultimine_rewind.menu.RewindMenu;
+import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
+public record ConfirmRewindPacket() implements CustomPacketPayload {
+    public static final Type<ConfirmRewindPacket> TYPE = new Type<>(
+            Identifier.fromNamespaceAndPath(UltimineRewind.MODID, "confirm_rewind"));
+    public static final StreamCodec<FriendlyByteBuf, ConfirmRewindPacket> STREAM_CODEC =
+            StreamCodec.unit(new ConfirmRewindPacket());
 
-/**
- * 确认恢复的数据包（客户端→服务端）
- */
-public class ConfirmRewindPacket {
-    
-    public ConfirmRewindPacket() {
+    @Override
+    public Type<ConfirmRewindPacket> type() {
+        return TYPE;
     }
-    
-    public static void encode(ConfirmRewindPacket packet, FriendlyByteBuf buf) {
-        // 无需编码数据
-    }
-    
-    public static ConfirmRewindPacket decode(FriendlyByteBuf buf) {
-        return new ConfirmRewindPacket();
-    }
-    
-    public static void handle(ConfirmRewindPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
-        NetworkEvent.Context context = contextSupplier.get();
-        context.enqueueWork(() -> {
-            ServerPlayer player = context.getSender();
-            if (player == null) return;
-            
-            // 检查玩家是否正在使用撤销菜单
-            if (player.containerMenu instanceof RewindMenu menu) {
-                RewindExecutor.executeRewind(player, menu);
-                player.closeContainer();
-            }
-        });
-        context.setPacketHandled(true);
+
+    public static void handle(ConfirmRewindPacket packet, PacketContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        if (player.containerMenu instanceof RewindMenu menu) {
+            RewindExecutor.execute(player, menu);
+            player.closeContainer();
+        }
     }
 }
-

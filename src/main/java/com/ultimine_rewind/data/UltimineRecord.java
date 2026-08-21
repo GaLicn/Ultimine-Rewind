@@ -4,90 +4,43 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-/**
- * 单次连锁采集的记录
- */
-public class UltimineRecord {
-    private final UUID playerId;
-    private final long timestamp;                    // 记录时间戳
-    private final List<BlockRecord> blocks;          // 被破坏的方块列表
-    private final BlockPos centerPos;                // 中心位置(第一个破坏的方块)
-    
-    public UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> blocks, BlockPos centerPos) {
-        this.playerId = playerId;
-        this.timestamp = timestamp;
-        this.blocks = new ArrayList<>(blocks);
-        this.centerPos = centerPos.immutable();
+/** 一次连锁采集的可撤销记录。 */
+public record UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> blocks, BlockPos centerPos) {
+    private static final long EXPIRY_MILLIS = 600_000L;
+
+    public UltimineRecord {
+        blocks = List.copyOf(blocks);
+        centerPos = centerPos.immutable();
     }
-    
-    public UUID getPlayerId() {
-        return playerId;
-    }
-    
-    public long getTimestamp() {
-        return timestamp;
-    }
-    
-    public List<BlockRecord> getBlocks() {
-        return Collections.unmodifiableList(blocks);
-    }
-    
-    public BlockPos getCenterPos() {
-        return centerPos;
-    }
-    
-    /**
-     * 获取所有需要的物品 (合并相同物品)
-     */
-    public Map<Item, Integer> getRequiredItems() {
-        Map<Item, Integer> items = new HashMap<>();
-        for (BlockRecord record : blocks) {
-            ItemStack stack = record.getRequiredItem();
+
+    public Map<Item, Integer> requiredItems() {
+        Map<Item, Integer> result = new LinkedHashMap<>();
+        for (BlockRecord block : blocks) {
+            ItemStack stack = block.requiredItem();
             if (!stack.isEmpty()) {
-                items.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                result.merge(stack.getItem(), stack.getCount(), Integer::sum);
             }
         }
-        return items;
+        return result;
     }
-    
-    /**
-     * 检查记录是否过期 (默认10分钟)
-     */
+
     public boolean isExpired() {
-        return isExpired(600_000); // 10分钟
+        return System.currentTimeMillis() - timestamp > EXPIRY_MILLIS;
     }
-    
-    /**
-     * 检查记录是否过期
-     * @param expiryTimeMs 过期时间（毫秒）
-     */
-    public boolean isExpired(long expiryTimeMs) {
-        return System.currentTimeMillis() - timestamp > expiryTimeMs;
-    }
-    
-    /**
-     * 获取方块数量
-     */
-    public int getBlockCount() {
+
+    public int blockCount() {
         return blocks.size();
     }
-    
-    /**
-     * 移除已恢复的方块（从前往后移除指定数量）
-     * @param count 要移除的方块数量
-     * @return 新的记录（如果还有剩余方块），否则返回null
-     */
-    public UltimineRecord removeRestoredBlocks(int count) {
-        if (count >= blocks.size()) {
-            // 已经全部恢复，返回null
-            return null;
-        }
-        
-        // 创建新的记录，包含剩余的方块
-        List<BlockRecord> remainingBlocks = new ArrayList<>(blocks.subList(count, blocks.size()));
-        return new UltimineRecord(playerId, timestamp, remainingBlocks, centerPos);
+
+    public UltimineRecord withoutRestored(List<BlockRecord> restored) {
+        List<BlockRecord> remaining = new ArrayList<>(blocks);
+        remaining.removeAll(restored);
+        return remaining.isEmpty() ? null : new UltimineRecord(playerId, timestamp, remaining, centerPos);
     }
 }
-
