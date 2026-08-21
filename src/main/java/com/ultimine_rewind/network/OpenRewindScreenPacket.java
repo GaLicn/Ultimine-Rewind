@@ -3,6 +3,7 @@ package com.ultimine_rewind.network;
 import com.ultimine_rewind.Ultimine_rewind;
 import com.ultimine_rewind.data.RewindDataManager;
 import com.ultimine_rewind.data.UltimineRecord;
+import com.ultimine_rewind.logic.RewindExecutor;
 import com.ultimine_rewind.menu.RewindMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.FriendlyByteBuf;
@@ -44,6 +45,12 @@ public class OpenRewindScreenPacket implements CustomPacketPayload {
                     return;
                 }
 
+                // 背包材料充足时直接撤回，仅在材料不足时打开补料界面。
+                if (RewindExecutor.hasEnoughMaterials(player, record)) {
+                    RewindExecutor.executeRewind(player, record);
+                    return;
+                }
+
                 // 打开容器界面并发送同步数据
                 player.openMenu(new SimpleMenuProvider(
                         (containerId, playerInventory, p) -> new RewindMenu(containerId, playerInventory, record),
@@ -61,4 +68,3 @@ public class OpenRewindScreenPacket implements CustomPacketPayload {
         return TYPE;
     }
 }
-

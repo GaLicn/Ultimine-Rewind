@@ -19,8 +19,8 @@ group = mod_group_id
 
 repositories {
     maven {
-        name = 'cursemaven'
-        url = uri("https://www.cursemaven.com")
+        name = 'ftb-maven'
+        url = uri("https://maven.ftb.dev/releases")
     }
     maven {
         name = "Modmaven"
@@ -123,9 +123,9 @@ configurations {
 }
 
 dependencies {
-    implementation "curse.maven:ftb-ultimine-forge-386134:7188395"
-    implementation "curse.maven:architectury-api-419699:5786327"
-    implementation "curse.maven:ftb-library-forge-404465:7182154"
+    implementation "dev.ftb.mods:ftb-ultimine-neoforge:2101.1.15"
+    implementation "dev.architectury:architectury-neoforge:13.0.1"
+    implementation "dev.ftb.mods:ftb-library-neoforge:2101.1.35"
 
 
     runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'])

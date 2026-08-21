@@ -1,155 +1,174 @@
 package com.ultimine_rewind.logic;
 
 import com.ultimine_rewind.data.BlockRecord;
+import com.ultimine_rewind.data.MaterialRequirement;
 import com.ultimine_rewind.data.RewindDataManager;
 import com.ultimine_rewind.data.UltimineRecord;
 import com.ultimine_rewind.menu.RewindMenu;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.function.Consumer;
 
-/**
- * 方块恢复执行器
- */
-public class RewindExecutor {
-    
-    /**
-     * 执行撤销恢复
-     *
-     * @param player 玩家
-     * @param menu   撤销菜单
-     */
-    public static void executeRewind(Player player, RewindMenu menu) {
-        UltimineRecord record = menu.record;
-        if (record == null) {
-            return;
+/** 方块恢复执行器。 */
+public final class RewindExecutor {
+    private RewindExecutor() {
+    }
+
+    public static boolean executeRewind(ServerPlayer player, RewindMenu menu) {
+        UltimineRecord record = menu.record();
+        if (record == null || !menu.validateItems()) {
+            player.displayClientMessage(Component.translatable(
+                    "message.ultimine_rewind.no_materials").withStyle(ChatFormatting.RED), false);
+            return false;
         }
-        
-        ServerLevel level = Objects.requireNonNull(player.getServer()).overworld();
-        boolean isCreative = player.isCreative();
-        
-        // 1. 验证物品（创造模式跳过）
-        if (!menu.validateItems()) {
-            player.displayClientMessage(
-                Component.translatable("message.ultimine_rewind.no_materials").withStyle(ChatFormatting.RED),
-                false
-            );
-            return;
+        return restore(player, record, menu.restorableBlocks(), menu::consumeFor);
+    }
+
+    public static boolean hasEnoughMaterials(ServerPlayer player, UltimineRecord record) {
+        if (player.isCreative()) {
+            return true;
         }
-        
-        // 计算可以恢复多少个方块
-        int restorableCount = menu.getRestorableBlockCount();
-        if (restorableCount <= 0 && !isCreative) {
-            player.displayClientMessage(
-                Component.translatable("message.ultimine_rewind.insufficient_materials").withStyle(ChatFormatting.RED),
-                false
-            );
-            return;
-        }
-        
-        // 2. 确定要恢复的方块列表（部分或全部）
-        int blocksToRestore = isCreative ? record.getBlockCount() : Math.min(restorableCount, record.getBlockCount());
-        List<BlockRecord> blocksToProcess = record.blocks().subList(0, blocksToRestore);
-        
-        // 3. 检查方块位置是否可以放置
-        for (BlockRecord blockRecord : blocksToProcess) {
-            BlockPos pos = blockRecord.getPos();
-            
-            // 检查区块是否加载
-            if (!level.isLoaded(pos)) {
-                // 静默跳过，不显示消息（避免刷屏）
-                continue;
-            }
-            
-            // 检查位置是否可以放置方块
-            BlockState currentState = level.getBlockState(pos);
-            // 只允许在空气或可替换的方块位置恢复
-            if (!currentState.isAir() && !currentState.canBeReplaced()) {
-                // 跳过已被占用的位置，继续恢复其他方块
-                continue;
+        List<MaterialRequirement> available = inventoryMaterials(player);
+        for (MaterialRequirement required : record.requiredMaterials()) {
+            int materialIndex = findMaterial(available, required.stack());
+            if (materialIndex < 0 || available.get(materialIndex).count() < required.count()) {
+                return false;
             }
         }
-        
-        // 4. 恢复方块（不恢复NBT数据，防止物品刷取漏洞）
-        int restoredCount = 0;
-        for (BlockRecord blockRecord : blocksToProcess) {
-            BlockPos pos = blockRecord.getPos();
-            BlockState state = blockRecord.getState();
-            
-            // 检查区块是否加载
-            if (!level.isLoaded(pos)) {
+        return true;
+    }
+
+    public static boolean executeRewind(ServerPlayer player, UltimineRecord record) {
+        if (!hasEnoughMaterials(player, record)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.ultimine_rewind.no_materials").withStyle(ChatFormatting.RED), false);
+            return false;
+        }
+        List<BlockRecord> candidates = restorableBlocks(record, inventoryMaterials(player), player.isCreative());
+        return restore(player, record, candidates, restored -> consumeInventory(player, restored));
+    }
+
+    private static boolean restore(ServerPlayer player, UltimineRecord record, List<BlockRecord> candidates,
+                                   Consumer<List<BlockRecord>> consumer) {
+        ServerLevel level = player.serverLevel();
+        List<BlockRecord> restored = new ArrayList<>();
+        for (BlockRecord block : candidates) {
+            BlockState current = level.getBlockState(block.pos());
+            if (!level.isLoaded(block.pos()) || (!current.isAir() && !current.canBeReplaced())) {
                 continue;
             }
-            
-            // 检查位置是否可用
-            BlockState currentState = level.getBlockState(pos);
-            if (!currentState.isAir() && !currentState.canBeReplaced()) {
-                continue;
-            }
-            
-            // 放置方块
-            level.setBlock(pos, state, Block.UPDATE_ALL | Block.UPDATE_CLIENTS);
-            
-            // 恢复方块实体数据（仅创造模式）
-            if (isCreative && blockRecord.getBlockEntityData() != null) {
-                BlockEntity blockEntity = level.getBlockEntity(pos);
-                if (blockEntity != null) {
-                    blockEntity.loadWithComponents(blockRecord.getBlockEntityData(), level.registryAccess());
-                    blockEntity.setChanged();
+            if (level.setBlock(block.pos(), block.state(), Block.UPDATE_ALL)) {
+                // 方块实体数据只在创造模式恢复，避免复制容器内容。
+                if (player.isCreative() && block.blockEntityData() != null) {
+                    BlockEntity blockEntity = level.getBlockEntity(block.pos());
+                    if (blockEntity != null) {
+                        blockEntity.loadWithComponents(block.blockEntityData(), level.registryAccess());
+                        blockEntity.setChanged();
+                    }
                 }
-            }
-            
-            restoredCount++;
-        }
-        
-        // 5. 消耗物品并返还剩余物品（在恢复完成后，传入实际恢复的数量）
-        menu.consumeItemsAndReturnRest(restoredCount);
-        
-        // 6. 更新或清除记录
-        int totalBlocks = record.getBlockCount();
-        if (restoredCount < totalBlocks) {
-            // 部分恢复，保留剩余方块的记录
-            UltimineRecord newRecord = record.removeRestoredBlocks(restoredCount);
-            RewindDataManager.updateRecord(player.getUUID(), newRecord);
-            
-            int remaining = totalBlocks - restoredCount;
-            player.displayClientMessage(
-                Component.translatable("message.ultimine_rewind.partial_restore", restoredCount, totalBlocks)
-                    .withStyle(ChatFormatting.YELLOW),
-                false
-            );
-            player.displayClientMessage(
-                Component.translatable("message.ultimine_rewind.remaining", remaining)
-                    .withStyle(ChatFormatting.GRAY),
-                true
-            );
-        } else {
-            // 完全恢复，清除记录
-            RewindDataManager.clearRecord(player.getUUID());
-            
-            if (isCreative) {
-                player.displayClientMessage(
-                    Component.translatable("message.ultimine_rewind.success_creative", restoredCount)
-                        .withStyle(ChatFormatting.GREEN),
-                    false
-                );
-            } else {
-                player.displayClientMessage(
-                    Component.translatable("message.ultimine_rewind.success", restoredCount)
-                        .withStyle(ChatFormatting.GREEN),
-                    false
-                );
+                restored.add(block);
             }
         }
 
+        consumer.accept(restored);
+        UltimineRecord remaining = record.withoutRestored(restored);
+        RewindDataManager.updateRecord(player.getUUID(), remaining);
+        if (remaining == null) {
+            String key = player.isCreative()
+                    ? "message.ultimine_rewind.success_creative"
+                    : "message.ultimine_rewind.success";
+            player.displayClientMessage(Component.translatable(key, restored.size()).withStyle(ChatFormatting.GREEN), false);
+        } else {
+            player.displayClientMessage(Component.translatable(
+                    "message.ultimine_rewind.partial_restore", restored.size(), record.getBlockCount())
+                    .withStyle(ChatFormatting.YELLOW), false);
+            player.displayClientMessage(Component.translatable(
+                    "message.ultimine_rewind.remaining", remaining.getBlockCount()).withStyle(ChatFormatting.GRAY), true);
+        }
+        return !restored.isEmpty();
+    }
+
+    private static List<BlockRecord> restorableBlocks(UltimineRecord record,
+                                                       List<MaterialRequirement> available, boolean creative) {
+        if (creative) {
+            return record.blocks();
+        }
+        List<BlockRecord> result = new ArrayList<>();
+        for (BlockRecord block : record.blocks()) {
+            ItemStack required = block.requiredItem();
+            int materialIndex = findMaterial(available, required);
+            if (!required.isEmpty() && materialIndex >= 0
+                    && available.get(materialIndex).count() >= required.getCount()) {
+                MaterialRequirement material = available.get(materialIndex);
+                available.set(materialIndex, new MaterialRequirement(
+                        material.stack(), material.count() - required.getCount()));
+                result.add(block);
+            }
+        }
+        return result;
+    }
+
+    private static List<MaterialRequirement> inventoryMaterials(ServerPlayer player) {
+        Inventory inventory = player.getInventory();
+        List<MaterialRequirement> available = new ArrayList<>();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            addMaterial(available, stack, stack.getCount());
+        }
+        return available;
+    }
+
+    private static void consumeInventory(ServerPlayer player, List<BlockRecord> restored) {
+        if (player.isCreative()) {
+            return;
+        }
+        List<MaterialRequirement> required = new ArrayList<>();
+        for (BlockRecord block : restored) {
+            ItemStack stack = block.requiredItem();
+            addMaterial(required, stack, stack.getCount());
+        }
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            int materialIndex = findMaterial(required, stack);
+            if (materialIndex >= 0) {
+                MaterialRequirement material = required.get(materialIndex);
+                int amount = Math.min(stack.getCount(), material.count());
+                stack.shrink(amount);
+                required.set(materialIndex, new MaterialRequirement(material.stack(), material.count() - amount));
+            }
+        }
+    }
+
+    private static void addMaterial(List<MaterialRequirement> materials, ItemStack stack, int count) {
+        if (stack.isEmpty() || count <= 0) {
+            return;
+        }
+        int materialIndex = findMaterial(materials, stack);
+        if (materialIndex < 0) {
+            materials.add(new MaterialRequirement(stack, count));
+        } else {
+            MaterialRequirement material = materials.get(materialIndex);
+            materials.set(materialIndex, new MaterialRequirement(material.stack(), material.count() + count));
+        }
+    }
+
+    private static int findMaterial(List<MaterialRequirement> materials, ItemStack stack) {
+        for (int index = 0; index < materials.size(); index++) {
+            if (ItemStack.isSameItemSameComponents(materials.get(index).stack(), stack)) {
+                return index;
+            }
+        }
+        return -1;
     }
 }
-

@@ -9,6 +9,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -17,10 +19,12 @@ import org.lwjgl.glfw.GLFW;
  */
 public class KeyBindings {
     
-    public static final String KEY_CATEGORY = "key.categories.ultimine_rewind";
+    public static final String KEY_CATEGORY = "key.category.ultimine_rewind.default";
     
     public static final KeyMapping REWIND_KEY = new KeyMapping(
-        "key.ultimine_rewind.rewind",
+        "key.ultimine_rewind.default.ultimine_rewind.rewind",
+        KeyConflictContext.IN_GAME,
+        KeyModifier.CONTROL,
         InputConstants.Type.KEYSYM,
         GLFW.GLFW_KEY_Z,
         KEY_CATEGORY
@@ -39,15 +43,9 @@ public class KeyBindings {
         @SubscribeEvent
         public static void onKeyInput(InputEvent.Key event) {
             if (REWIND_KEY.consumeClick()) {
-                // 检查是否按住 Ctrl 键
-                boolean ctrlPressed = (event.getModifiers() & GLFW.GLFW_MOD_CONTROL) != 0;
-                
-                if (ctrlPressed) {
-                    // 发送打开界面请求到服务端
-                    PacketDistributor.sendToServer(OpenRewindScreenPacket.INSTANCE);
-                }
+                // 原生组合键映射会验证 Ctrl 修饰键，并支持玩家自行重绑。
+                PacketDistributor.sendToServer(OpenRewindScreenPacket.INSTANCE);
             }
         }
     }
 }
-

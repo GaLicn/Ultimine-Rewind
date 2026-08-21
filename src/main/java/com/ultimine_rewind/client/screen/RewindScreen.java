@@ -1,6 +1,7 @@
 package com.ultimine_rewind.client.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.ultimine_rewind.data.MaterialRequirement;
 import com.ultimine_rewind.menu.RewindMenu;
 import com.ultimine_rewind.network.ConfirmRewindPacket;
 import net.minecraft.ChatFormatting;
@@ -10,236 +11,173 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-/**
- * 撤销界面 - 客户端GUI（使用原版箱子材质）
- */
+/** 使用材料清单面板展示撤回所需材料。 */
 public class RewindScreen extends AbstractContainerScreen<RewindMenu> {
-    
-    // 使用原版大箱子材质
-    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/gui/container/generic_54.png");
-
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace(
+            "textures/gui/container/generic_54.png");
+    private static final int MAX_PANEL_WIDTH = 164;
+    private static final int PANEL_GAP = 8;
+    private static final int MATERIAL_ROW_HEIGHT = 22;
     private Button confirmButton;
-    private Button cancelButton;
-    private Button detailsButton;
-    private List<Component> requiredItemsText;
-    
-    private final int containerRows = 6; // 6行x9列，原版大箱子
-    private boolean showDetails = false;
-    
+    private int materialScroll;
+    private int panelWidth = MAX_PANEL_WIDTH;
+    private boolean buttonsInPanel;
+
     public RewindScreen(RewindMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        this.imageHeight = 114 + containerRows * 18; // 原版箱子高度计算
-        this.inventoryLabelY = this.imageHeight - 94;
+        imageHeight = 222;
+        inventoryLabelY = imageHeight - 94;
     }
-    
+
     @Override
     protected void init() {
         super.init();
-        
-        // 按钮位置在界面右侧
-        int buttonX = this.leftPos + this.imageWidth + 5;
-        int buttonWidth = 80;
-        
-        // 确认按钮 - 靠右上
-        this.confirmButton = Button.builder(
-            Component.translatable("gui.ultimine_rewind.button.restore"),
-            btn -> onConfirmClicked()
-        )
-        .bounds(buttonX, this.topPos + 20, buttonWidth, 30)
-        .build();
-        this.addRenderableWidget(confirmButton);
-        
-        // 取消按钮 - 确认按钮下方
-        this.cancelButton = Button.builder(
-            Component.translatable("gui.ultimine_rewind.button.cancel"),
-            btn -> this.onClose()
-        )
-        .bounds(buttonX, this.topPos + 55, buttonWidth, 30)
-        .build();
-        this.addRenderableWidget(cancelButton);
-        
-        // 计算需要的物品文本
-        updateRequiredItemsText();
+        configureResponsiveLayout();
+        int buttonWidth = buttonsInPanel ? (panelWidth - 24) / 2 : 96;
+        int buttonX = buttonsInPanel ? panelX() + 8 : leftPos + imageWidth + PANEL_GAP;
+        int buttonY = buttonsInPanel ? topPos + imageHeight - 29 : topPos + 22;
+        confirmButton = addRenderableWidget(Button.builder(
+                        Component.translatable("gui.ultimine_rewind.button.restore"), button -> confirm())
+                .bounds(buttonX, buttonY, buttonWidth, buttonsInPanel ? 20 : 24)
+                .build());
+        addRenderableWidget(Button.builder(
+                        Component.translatable("gui.ultimine_rewind.button.cancel"), button -> onClose())
+                .bounds(buttonsInPanel ? buttonX + buttonWidth + 4 : buttonX,
+                        buttonsInPanel ? buttonY : topPos + 52, buttonWidth, buttonsInPanel ? 20 : 24)
+                .build());
     }
-    
-    /**
-     * 切换材料详情显示
-     */
-    private void toggleDetails() {
-        showDetails = !showDetails;
-    }
-    
-    private void updateRequiredItemsText() {
-        requiredItemsText = new ArrayList<>();
-        
-        // 检查是否是创造模式
-        boolean isCreative = this.minecraft != null && this.minecraft.player != null && this.minecraft.player.isCreative();
-        
-        if (isCreative) {
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_mode").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_no_materials").withStyle(ChatFormatting.GREEN));
-            requiredItemsText.add(Component.literal(""));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_click_restore").withStyle(ChatFormatting.GRAY));
-        } else if (menu.hasData()) {
-            Map<Item, Integer> required = menu.getRequiredItems();
-            
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.required_items").withStyle(ChatFormatting.BOLD));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.material_count", required.size()).withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.click_for_details").withStyle(ChatFormatting.GRAY));
+
+    private void configureResponsiveLayout() {
+        int availablePanelWidth = width - imageWidth - PANEL_GAP * 2 - 96 - 6;
+        buttonsInPanel = availablePanelWidth < 112;
+        if (buttonsInPanel) {
+            panelWidth = Math.min(MAX_PANEL_WIDTH, Math.max(110, width - imageWidth - PANEL_GAP - 8));
+            int totalWidth = panelWidth + PANEL_GAP + imageWidth;
+            leftPos = (width - totalWidth) / 2 + panelWidth + PANEL_GAP;
         } else {
-            // 客户端没有record数据时的提示
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.rewind_hint").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-            requiredItemsText.add(Component.literal(""));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.place_blocks").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.into_container").withStyle(ChatFormatting.GRAY));
-            requiredItemsText.add(Component.literal(""));
-            requiredItemsText.add(Component.translatable("gui.ultimine_rewind.creative_no_cost").withStyle(ChatFormatting.GREEN));
+            panelWidth = Math.min(MAX_PANEL_WIDTH, availablePanelWidth);
+            int totalWidth = panelWidth + PANEL_GAP * 2 + imageWidth + 96;
+            leftPos = (width - totalWidth) / 2 + panelWidth + PANEL_GAP;
         }
     }
-    
+
     @Override
-    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-        this.renderTooltip(guiGraphics, mouseX, mouseY);
-        
-        // 绘制需要的物品列表（左侧信息面板 - 更长）
-        if (requiredItemsText != null && !requiredItemsText.isEmpty()) {
-            int panelX = this.leftPos - 160;
-            int panelY = this.topPos;
-            int panelWidth = 150;
-            int panelHeight = this.imageHeight; // 与主界面同高
-            
-            // 绘制信息面板背景（半透明）
-            guiGraphics.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, 0xDD000000);
-            // 面板边框（立体效果）
-            guiGraphics.fill(panelX, panelY, panelX + panelWidth, panelY + 1, 0xFFAAAAAA);
-            guiGraphics.fill(panelX, panelY, panelX + 1, panelY + panelHeight, 0xFFAAAAAA);
-            guiGraphics.fill(panelX + panelWidth - 1, panelY, panelX + panelWidth, panelY + panelHeight, 0xFF555555);
-            guiGraphics.fill(panelX, panelY + panelHeight - 1, panelX + panelWidth, panelY + panelHeight, 0xFF555555);
-            
-            // 绘制标题
-            Component panelTitle = Component.translatable("gui.ultimine_rewind.panel_title").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD);
-            int titleWidth = this.font.width(panelTitle);
-            guiGraphics.drawString(this.font, panelTitle, panelX + (panelWidth - titleWidth) / 2, panelY + 8, 0xFFFFFF);
-            
-            // 绘制分隔线
-            guiGraphics.fill(panelX + 5, panelY + 20, panelX + panelWidth - 5, panelY + 21, 0xFF888888);
-            
-            // 绘制文本
-            int textY = panelY + 28;
-            for (Component text : requiredItemsText) {
-                guiGraphics.drawString(this.font, text, panelX + 8, textY, 0xFFFFFF);
-                textY += 12;
-            }
-            
-            // 绘制材料详情按钮（在文本下方）
-            int buttonY = textY + 10;
-            int buttonHeight = 20;
-            
-            // 移除旧按钮
-            if (detailsButton != null) {
-                this.removeWidget(detailsButton);
-            }
-            
-            // 始终显示按钮
-            detailsButton = Button.builder(
-                showDetails ? 
-                    Component.translatable("gui.ultimine_rewind.button.close_details") : 
-                    Component.translatable("gui.ultimine_rewind.button.view_materials"),
-                btn -> toggleDetails()
-            )
-            .bounds(panelX + 5, buttonY, panelWidth - 10, buttonHeight)
-            .build();
-            this.addRenderableWidget(detailsButton);
-            
-            // 如果显示详情，绘制物品列表
-            if (showDetails) {
-                int detailY = buttonY + buttonHeight + 10;
-                
-                // 绘制分隔线
-                guiGraphics.fill(panelX + 5, detailY - 5, panelX + panelWidth - 5, detailY - 4, 0xFF888888);
-                
-                // 检查是否有数据
-                if (menu.hasData()) {
-                    Map<Item, Integer> required = menu.getRequiredItems();
-                    for (Map.Entry<Item, Integer> entry : required.entrySet()) {
-                        // 绘制物品图标
-                        guiGraphics.renderItem(new net.minecraft.world.item.ItemStack(entry.getKey()), panelX + 10, detailY);
-                        
-                        // 绘制物品名称和数量
-                        Component itemName = entry.getKey().getDescription();
-                        String text = itemName.getString() + " x" + entry.getValue();
-                        guiGraphics.drawString(this.font, text, panelX + 30, detailY + 4, 0xFFFFFF);
-                        
-                        detailY += 20;
-                        
-                        // 防止超出面板范围
-                        if (detailY > panelY + panelHeight - 10) {
-                            guiGraphics.drawString(this.font, "...", panelX + 10, detailY, 0xFF888888);
-                            break;
-                        }
-                    }
-                } else {
-                    // 没有数据时显示提示
-                    guiGraphics.drawString(this.font, 
-                        Component.translatable("gui.ultimine_rewind.material_info").getString(), 
-                        panelX + 10, detailY, 0xFFFFFF);
-                    detailY += 15;
-                    guiGraphics.drawString(this.font, 
-                        Component.translatable("gui.ultimine_rewind.auto_display").getString(), 
-                        panelX + 10, detailY, 0xFF888888);
-                    detailY += 12;
-                    guiGraphics.drawString(this.font, 
-                        Component.translatable("gui.ultimine_rewind.auto_display_2").getString(), 
-                        panelX + 10, detailY, 0xFF888888);
-                }
-            }
-        }
-        
-        // 更新确认按钮状态
-        // 在客户端，如果record为null，默认启用按钮（由服务端验证）
-        if (menu.record == null) {
-            confirmButton.active = true;
-        } else {
-            confirmButton.active = menu.validateItems();
-        }
+    public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics, mouseX, mouseY, partialTick);
+        super.render(graphics, mouseX, mouseY, partialTick);
+        renderInfoPanel(graphics, mouseX, mouseY);
+        renderTooltip(graphics, mouseX, mouseY);
+        confirmButton.active = menu.hasData();
     }
-    
+
     @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        int x = this.leftPos;
-        int y = this.topPos;
-        
-        // 绘制容器顶部
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, this.imageWidth, containerRows * 18 + 17);
-        
-        // 绘制玩家背包部分
-        guiGraphics.blit(TEXTURE, x, y + containerRows * 18 + 17, 0, 126, this.imageWidth, 96);
+        graphics.blit(TEXTURE, leftPos, topPos, 0, 0, imageWidth, 125, 256, 256);
+        graphics.blit(TEXTURE, leftPos, topPos + 125, 0, 126, imageWidth, 96, 256, 256);
     }
-    
+
+    private void renderInfoPanel(GuiGraphics graphics, int mouseX, int mouseY) {
+        int panelX = panelX();
+        int panelBottom = topPos + imageHeight;
+        graphics.fill(panelX - 1, topPos - 1, panelX + panelWidth + 1, panelBottom + 1, 0xFF171B22);
+        graphics.fill(panelX, topPos, panelX + panelWidth, panelBottom, 0xF0222730);
+        graphics.fill(panelX, topPos, panelX + 3, panelBottom, 0xFF5FC7B2);
+        graphics.fill(panelX + 3, topPos, panelX + panelWidth, topPos + 42, 0xFF2C3440);
+
+        graphics.drawString(font, Component.translatable("gui.ultimine_rewind.panel_title")
+                .withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD), panelX + 12, topPos + 9, 0xFFFFFFFF);
+        graphics.drawString(font, Component.translatable("gui.ultimine_rewind.subtitle"),
+                panelX + 12, topPos + 25, 0xFFAAB4C3);
+
+        int statWidth = Math.max(40, (panelWidth - 26) / 2);
+        renderStatCard(graphics, panelX + 10, topPos + 50, statWidth,
+                Component.translatable("gui.ultimine_rewind.blocks"), menu.getBlockCount());
+        renderStatCard(graphics, panelX + 16 + statWidth, topPos + 50, statWidth,
+                Component.translatable("gui.ultimine_rewind.material_types"), menu.requiredMaterials().size());
+        graphics.drawString(font, Component.translatable("gui.ultimine_rewind.materials"),
+                panelX + 11, topPos + 82, 0xFFE7ECF3);
+
+        if (minecraft != null && minecraft.player != null && minecraft.player.isCreative()) {
+            graphics.drawString(font, Component.translatable("gui.ultimine_rewind.creative_free"),
+                    panelX + 11, topPos + 94, 0xFF74D9A7);
+        }
+        renderMaterialList(graphics, mouseX, mouseY, panelX, panelBottom);
+    }
+
+    private void renderStatCard(GuiGraphics graphics, int x, int y, int width, Component label, int value) {
+        graphics.fill(x, y, x + width, y + 25, 0xFF303946);
+        graphics.fill(x, y, x + 2, y + 25, 0xFF5FC7B2);
+        graphics.drawString(font, Integer.toString(value), x + 8, y + 4, 0xFFFFFFFF);
+        graphics.drawString(font, label, x + 8, y + 14, 0xFF9DA8B7);
+    }
+
+    private void renderMaterialList(GuiGraphics graphics, int mouseX, int mouseY, int panelX, int panelBottom) {
+        List<MaterialRequirement> materials = menu.requiredMaterials();
+        int listTop = topPos + 108;
+        int listBottom = panelBottom - 10;
+        int visibleRows = Math.max(1, (listBottom - listTop) / MATERIAL_ROW_HEIGHT);
+        int maxScroll = Math.max(0, materials.size() - visibleRows);
+        materialScroll = Math.min(materialScroll, maxScroll);
+
+        for (int index = materialScroll; index < Math.min(materials.size(), materialScroll + visibleRows); index++) {
+            int rowY = listTop + (index - materialScroll) * MATERIAL_ROW_HEIGHT;
+            renderMaterialRow(graphics, materials.get(index), panelX + 9, rowY, mouseX, mouseY);
+        }
+        if (maxScroll > 0) {
+            int trackHeight = listBottom - listTop;
+            int thumbHeight = Math.max(18, trackHeight * visibleRows / materials.size());
+            int thumbY = listTop + (trackHeight - thumbHeight) * materialScroll / maxScroll;
+            graphics.fill(panelX + panelWidth - 6, listTop, panelX + panelWidth - 4, listBottom, 0xFF343C48);
+            graphics.fill(panelX + panelWidth - 6, thumbY, panelX + panelWidth - 4,
+                    thumbY + thumbHeight, 0xFF6ED7C0);
+        }
+    }
+
+    private void renderMaterialRow(GuiGraphics graphics, MaterialRequirement material, int x, int y,
+                                   int mouseX, int mouseY) {
+        int rowWidth = panelWidth - 19;
+        boolean hovered = mouseX >= x && mouseX < x + rowWidth
+                && mouseY >= y && mouseY < y + MATERIAL_ROW_HEIGHT - 2;
+        graphics.fill(x, y, x + rowWidth, y + MATERIAL_ROW_HEIGHT - 2,
+                hovered ? 0xFF3B4654 : 0xFF2B333E);
+        graphics.renderItem(material.stack(), x + 4, y + 3);
+
+        String name = font.plainSubstrByWidth(material.stack().getHoverName().getString(), 78);
+        String count = "×" + material.count();
+        graphics.drawString(font, name, x + 25, y + 7, 0xFFE8EDF4);
+        graphics.drawString(font, count, x + rowWidth - 5 - font.width(count), y + 7, 0xFF72DCC4);
+        if (hovered) {
+            graphics.renderTooltip(font, material.stack(), mouseX, mouseY);
+        }
+    }
+
     @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // 绘制标题
-        guiGraphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, 4210752, false);
-        
-        // 绘制背包标签
-        guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, 4210752, false);
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int panelX = panelX();
+        int listTop = topPos + 108;
+        int listBottom = topPos + imageHeight - 10;
+        if (mouseX >= panelX && mouseX < panelX + panelWidth
+                && mouseY >= listTop && mouseY < listBottom && scrollY != 0.0D) {
+            int visibleRows = Math.max(1, (listBottom - listTop) / MATERIAL_ROW_HEIGHT);
+            int maxScroll = Math.max(0, menu.requiredMaterials().size() - visibleRows);
+            materialScroll = Math.max(0, Math.min(maxScroll, materialScroll - (int) Math.signum(scrollY)));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
-    
-    private void onConfirmClicked() {
-        // 发送确认恢复数据包到服务端
+
+    private void confirm() {
         PacketDistributor.sendToServer(ConfirmRewindPacket.INSTANCE);
-        this.onClose();
+        onClose();
+    }
+
+    private int panelX() {
+        return leftPos - panelWidth - PANEL_GAP;
     }
 }
-

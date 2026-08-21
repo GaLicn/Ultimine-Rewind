@@ -1,10 +1,13 @@
 package com.ultimine_rewind.data;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 单次连锁采集的记录
@@ -14,30 +17,47 @@ import java.util.*;
  * @param centerPos 中心位置(第一个破坏的方块)
  */
 public record UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> blocks, BlockPos centerPos) {
-    public UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> blocks, BlockPos centerPos) {
-        this.playerId = playerId;
-        this.timestamp = timestamp;
-        this.blocks = new ArrayList<>(blocks);
-        this.centerPos = centerPos.immutable();
-    }
-
-    @Override
-    public List<BlockRecord> blocks() {
-        return Collections.unmodifiableList(blocks);
+    public UltimineRecord {
+        blocks = List.copyOf(blocks);
+        centerPos = centerPos.immutable();
     }
 
     /**
      * 获取所有需要的物品 (合并相同物品)
      */
-    public Map<Item, Integer> getRequiredItems() {
-        Map<Item, Integer> items = new HashMap<>();
+    public List<MaterialRequirement> requiredMaterials() {
+        List<MaterialRequirement> result = new ArrayList<>();
         for (BlockRecord record : blocks) {
-            ItemStack stack = record.getRequiredItem();
+            ItemStack stack = record.requiredItem();
             if (!stack.isEmpty()) {
-                items.merge(stack.getItem(), stack.getCount(), Integer::sum);
+                int index = findMaterial(result, stack);
+                if (index < 0) {
+                    result.add(new MaterialRequirement(stack, stack.getCount()));
+                } else {
+                    MaterialRequirement material = result.get(index);
+                    result.set(index, new MaterialRequirement(material.stack(), material.count() + stack.getCount()));
+                }
             }
         }
+        return List.copyOf(result);
+    }
+
+    /** 供旧版客户端同步界面使用的按物品聚合数据。 */
+    public Map<net.minecraft.world.item.Item, Integer> getRequiredItems() {
+        Map<net.minecraft.world.item.Item, Integer> items = new LinkedHashMap<>();
+        for (MaterialRequirement material : requiredMaterials()) {
+            items.merge(material.stack().getItem(), material.count(), Integer::sum);
+        }
         return items;
+    }
+
+    private static int findMaterial(List<MaterialRequirement> materials, ItemStack stack) {
+        for (int index = 0; index < materials.size(); index++) {
+            if (ItemStack.isSameItemSameComponents(materials.get(index).stack(), stack)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -69,15 +89,9 @@ public record UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> bl
      * @param count 要移除的方块数量
      * @return 新的记录（如果还有剩余方块），否则返回null
      */
-    public UltimineRecord removeRestoredBlocks(int count) {
-        if (count >= blocks.size()) {
-            // 已经全部恢复，返回null
-            return null;
-        }
-
-        // 创建新的记录，包含剩余的方块
-        List<BlockRecord> remainingBlocks = new ArrayList<>(blocks.subList(count, blocks.size()));
-        return new UltimineRecord(playerId, timestamp, remainingBlocks, centerPos);
+    public UltimineRecord withoutRestored(List<BlockRecord> restored) {
+        List<BlockRecord> remaining = new ArrayList<>(blocks);
+        remaining.removeAll(restored);
+        return remaining.isEmpty() ? null : new UltimineRecord(playerId, timestamp, remaining, centerPos);
     }
 }
-

@@ -17,6 +17,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -49,6 +50,7 @@ public abstract class MixinFTBUltimine {
             at = @At(
                     value = "FIELD",
                     target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+                    opcode = Opcodes.PUTFIELD,
                     ordinal = 0,
                     shift = At.Shift.BEFORE
             ),
@@ -82,6 +84,7 @@ public abstract class MixinFTBUltimine {
             at = @At(
                     value = "FIELD",
                     target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+                    opcode = Opcodes.PUTFIELD,
                     ordinal = 1,
                     shift = At.Shift.AFTER
             ),
@@ -90,6 +93,11 @@ public abstract class MixinFTBUltimine {
     private void ultimine_rewind$onUltimineEnd(Level world, BlockPos origPos, BlockState state,
                                                ServerPlayer player, @Nullable IntValue xp, CallbackInfoReturnable<EventResult> cir) {
         // 连锁结束，保存记录
+        if (ultimine_rewind$currentBlockRecords != null && !ultimine_rewind$currentBlockRecords.isEmpty()) {
+            // 仅保留实际被破坏的位置，避免连锁中断留下错误记录。
+            ultimine_rewind$currentBlockRecords.removeIf(record ->
+                    !world.getBlockState(record.pos()).isAir());
+        }
         if (ultimine_rewind$currentBlockRecords != null && !ultimine_rewind$currentBlockRecords.isEmpty()) {
             RewindDataManager.recordUltimine(player, ultimine_rewind$currentBlockRecords, ultimine_rewind$currentCenterPos);
 
@@ -124,9 +132,9 @@ public abstract class MixinFTBUltimine {
             beData = blockEntity.saveWithFullMetadata(level.registryAccess());
         }
 
-        // 记录方块信息（包含NBT数据，由恢复器决定是否使用）
-        BlockRecord record = new BlockRecord(pos, blockState, beData);
+        // 使用克隆物品栈保留模组方块映射及物品组件。
+        var requiredItem = blockState.getBlock().getCloneItemStack(level, pos, blockState);
+        BlockRecord record = new BlockRecord(pos, blockState, requiredItem, beData);
         ultimine_rewind$currentBlockRecords.add(record);
     }
 }
-
