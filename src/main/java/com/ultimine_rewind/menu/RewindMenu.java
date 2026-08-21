@@ -1,21 +1,21 @@
 package com.ultimine_rewind.menu;
 
 import com.ultimine_rewind.data.BlockRecord;
+import com.ultimine_rewind.data.MaterialRequirement;
 import com.ultimine_rewind.data.UltimineRecord;
 import com.ultimine_rewind.init.ModMenuTypes;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 /** 放入恢复材料的 6×9 容器菜单。 */
 public class RewindMenu extends AbstractContainerMenu {
@@ -23,11 +23,22 @@ public class RewindMenu extends AbstractContainerMenu {
     private final Container container = new SimpleContainer(CONTAINER_SIZE);
     private final Player player;
     private final @Nullable UltimineRecord record;
-    private Map<Item, Integer> clientRequiredItems = new LinkedHashMap<>();
+    private List<MaterialRequirement> clientRequiredMaterials = List.of();
     private int clientBlockCount;
 
     public RewindMenu(int containerId, Inventory inventory) {
-        this(containerId, inventory, null);
+        this(containerId, inventory, (UltimineRecord) null);
+    }
+
+    public RewindMenu(int containerId, Inventory inventory, RegistryFriendlyByteBuf buffer) {
+        this(containerId, inventory, (UltimineRecord) null);
+        clientBlockCount = buffer.readVarInt();
+        int materialCount = buffer.readVarInt();
+        List<MaterialRequirement> materials = new ArrayList<>(materialCount);
+        for (int index = 0; index < materialCount; index++) {
+            materials.add(new MaterialRequirement(ItemStack.STREAM_CODEC.decode(buffer), buffer.readVarInt()));
+        }
+        clientRequiredMaterials = List.copyOf(materials);
     }
 
     public RewindMenu(int containerId, Inventory inventory, @Nullable UltimineRecord record) {
@@ -56,13 +67,18 @@ public class RewindMenu extends AbstractContainerMenu {
         return record;
     }
 
-    public void setClientData(Map<Item, Integer> requiredItems, int blockCount) {
-        clientRequiredItems = new LinkedHashMap<>(requiredItems);
-        clientBlockCount = blockCount;
+    public static void writeClientData(RegistryFriendlyByteBuf buffer, UltimineRecord record) {
+        List<MaterialRequirement> materials = record.requiredMaterials();
+        buffer.writeVarInt(record.blockCount());
+        buffer.writeVarInt(materials.size());
+        for (MaterialRequirement material : materials) {
+            ItemStack.STREAM_CODEC.encode(buffer, material.stack());
+            buffer.writeVarInt(material.count());
+        }
     }
 
-    public Map<Item, Integer> requiredItems() {
-        return record == null ? clientRequiredItems : record.requiredItems();
+    public List<MaterialRequirement> requiredMaterials() {
+        return record == null ? clientRequiredMaterials : record.requiredMaterials();
     }
 
     public int blockCount() {
@@ -80,11 +96,12 @@ public class RewindMenu extends AbstractContainerMenu {
         if (player.isCreative()) {
             return true;
         }
-        Map<Item, Integer> required = record.requiredItems();
         for (int index = 0; index < CONTAINER_SIZE; index++) {
             ItemStack stack = container.getItem(index);
-            if (!stack.isEmpty() && required.containsKey(stack.getItem())) {
-                return true;
+            for (MaterialRequirement material : record.requiredMaterials()) {
+                if (ItemStack.isSameItemSameComponents(stack, material.stack())) {
+                    return true;
+                }
             }
         }
         return false;
@@ -99,10 +116,10 @@ public class RewindMenu extends AbstractContainerMenu {
             return record.blocks();
         }
 
-        Map<Item, Integer> available = new HashMap<>();
+        List<MaterialRequirement> available = new ArrayList<>();
         for (int index = 0; index < CONTAINER_SIZE; index++) {
             ItemStack stack = container.getItem(index);
-            available.merge(stack.getItem(), stack.getCount(), Integer::sum);
+            addMaterial(available, stack, stack.getCount());
         }
 
         java.util.List<BlockRecord> result = new java.util.ArrayList<>();
@@ -111,9 +128,11 @@ public class RewindMenu extends AbstractContainerMenu {
             if (required.isEmpty()) {
                 continue;
             }
-            int count = available.getOrDefault(required.getItem(), 0);
-            if (count >= required.getCount()) {
-                available.put(required.getItem(), count - required.getCount());
+            int materialIndex = findMaterial(available, required);
+            if (materialIndex >= 0 && available.get(materialIndex).count() >= required.getCount()) {
+                MaterialRequirement material = available.get(materialIndex);
+                available.set(materialIndex, new MaterialRequirement(
+                        material.stack(), material.count() - required.getCount()));
                 result.add(block);
             }
         }
@@ -124,23 +143,48 @@ public class RewindMenu extends AbstractContainerMenu {
         if (record == null || player.level().isClientSide()) {
             return;
         }
-        Map<Item, Integer> consume = new HashMap<>();
+        List<MaterialRequirement> consume = new ArrayList<>();
         if (!player.isCreative()) {
             for (BlockRecord block : restored) {
                 ItemStack required = block.requiredItem();
-                consume.merge(required.getItem(), required.getCount(), Integer::sum);
+                addMaterial(consume, required, required.getCount());
             }
         }
 
         for (int index = 0; index < CONTAINER_SIZE; index++) {
             ItemStack stack = container.removeItemNoUpdate(index);
-            int amount = Math.min(stack.getCount(), consume.getOrDefault(stack.getItem(), 0));
+            int materialIndex = findMaterial(consume, stack);
+            int remaining = materialIndex < 0 ? 0 : consume.get(materialIndex).count();
+            int amount = Math.min(stack.getCount(), remaining);
             if (amount > 0) {
                 stack.shrink(amount);
-                consume.merge(stack.getItem(), -amount, Integer::sum);
+                MaterialRequirement material = consume.get(materialIndex);
+                consume.set(materialIndex, new MaterialRequirement(material.stack(), remaining - amount));
             }
             returnToPlayer(stack);
         }
+    }
+
+    private static void addMaterial(List<MaterialRequirement> materials, ItemStack stack, int count) {
+        if (stack.isEmpty() || count <= 0) {
+            return;
+        }
+        int index = findMaterial(materials, stack);
+        if (index < 0) {
+            materials.add(new MaterialRequirement(stack, count));
+        } else {
+            MaterialRequirement material = materials.get(index);
+            materials.set(index, new MaterialRequirement(material.stack(), material.count() + count));
+        }
+    }
+
+    private static int findMaterial(List<MaterialRequirement> materials, ItemStack stack) {
+        for (int index = 0; index < materials.size(); index++) {
+            if (ItemStack.isSameItemSameComponents(materials.get(index).stack(), stack)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private void returnToPlayer(ItemStack stack) {

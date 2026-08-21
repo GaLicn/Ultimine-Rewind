@@ -11,7 +11,5 @@ public final class NetworkHandler {
                 OpenRewindScreenPacket::handle);
         NetworkHelper.registerC2S(ConfirmRewindPacket.TYPE, ConfirmRewindPacket.STREAM_CODEC,
                 ConfirmRewindPacket::handle);
-        NetworkHelper.registerS2C(SyncRecordPacket.TYPE, SyncRecordPacket.STREAM_CODEC,
-                SyncRecordPacket::handle);
     }
 }

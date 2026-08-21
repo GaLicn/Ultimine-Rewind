@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -35,7 +36,12 @@ public abstract class MixinFTBUltimine {
 
     @Inject(
             method = "handleBlockBreak",
-            at = @At(value = "FIELD", target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z", ordinal = 0))
+            at = @At(
+                    value = "FIELD",
+                    target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+                    opcode = Opcodes.PUTFIELD,
+                    ordinal = 0,
+                    shift = At.Shift.AFTER))
     private void ultimineRewind$capture(LevelAccessor level, BlockPos origin, BlockState state,
                                        ServerPlayer player, CallbackInfoReturnable<Boolean> callback) {
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -52,13 +58,21 @@ public abstract class MixinFTBUltimine {
             BlockState blockState = serverLevel.getBlockState(pos);
             BlockEntity blockEntity = serverLevel.getBlockEntity(pos);
             CompoundTag blockEntityData = blockEntity == null ? null : blockEntity.saveWithFullMetadata(serverLevel.registryAccess());
-            ultimineRewind$records.add(new BlockRecord(pos, blockState, blockEntityData));
+            // 克隆物品栈可正确保留模组方块映射与物品组件。
+            var requiredItem = blockState.getBlock().getCloneItemStack(
+                    serverLevel, pos, blockState, false, player);
+            ultimineRewind$records.add(new BlockRecord(pos, blockState, requiredItem, blockEntityData));
         }
     }
 
     @Inject(
             method = "handleBlockBreak",
-            at = @At(value = "FIELD", target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z", ordinal = 1, shift = At.Shift.AFTER))
+            at = @At(
+                    value = "FIELD",
+                    target = "Ldev/ftb/mods/ftbultimine/FTBUltimine;isBreakingBlock:Z",
+                    opcode = Opcodes.PUTFIELD,
+                    ordinal = 1,
+                    shift = At.Shift.AFTER))
     private void ultimineRewind$save(LevelAccessor level, BlockPos origin, BlockState state,
                                     ServerPlayer player, CallbackInfoReturnable<Boolean> callback) {
         if (ultimineRewind$records == null || ultimineRewind$records.isEmpty()) {

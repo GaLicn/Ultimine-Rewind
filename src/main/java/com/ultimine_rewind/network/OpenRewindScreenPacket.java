@@ -5,7 +5,6 @@ import com.ultimine_rewind.data.RewindDataManager;
 import com.ultimine_rewind.data.UltimineRecord;
 import com.ultimine_rewind.menu.RewindMenu;
 import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
-import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -37,7 +36,7 @@ public record OpenRewindScreenPacket() implements CustomPacketPayload {
 
         player.openMenu(new SimpleMenuProvider(
                 (containerId, inventory, ignored) -> new RewindMenu(containerId, inventory, record),
-                Component.translatable("container.ultimine_rewind.rewind_menu")));
-        Server2PlayNetworking.send(player, SyncRecordPacket.from(record));
+                Component.translatable("container.ultimine_rewind.rewind_menu")),
+                buffer -> RewindMenu.writeClientData(buffer, record));
     }
 }

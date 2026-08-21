@@ -1,13 +1,10 @@
 package com.ultimine_rewind.data;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /** 一次连锁采集的可撤销记录。 */
@@ -19,15 +16,32 @@ public record UltimineRecord(UUID playerId, long timestamp, List<BlockRecord> bl
         centerPos = centerPos.immutable();
     }
 
-    public Map<Item, Integer> requiredItems() {
-        Map<Item, Integer> result = new LinkedHashMap<>();
+    public List<MaterialRequirement> requiredMaterials() {
+        List<MaterialRequirement> result = new ArrayList<>();
         for (BlockRecord block : blocks) {
             ItemStack stack = block.requiredItem();
-            if (!stack.isEmpty()) {
-                result.merge(stack.getItem(), stack.getCount(), Integer::sum);
+            if (stack.isEmpty()) {
+                continue;
+            }
+
+            int existingIndex = findMaterial(result, stack);
+            if (existingIndex < 0) {
+                result.add(new MaterialRequirement(stack, stack.getCount()));
+            } else {
+                MaterialRequirement existing = result.get(existingIndex);
+                result.set(existingIndex, new MaterialRequirement(existing.stack(), existing.count() + stack.getCount()));
             }
         }
-        return result;
+        return List.copyOf(result);
+    }
+
+    private static int findMaterial(List<MaterialRequirement> materials, ItemStack stack) {
+        for (int index = 0; index < materials.size(); index++) {
+            if (ItemStack.isSameItemSameComponents(materials.get(index).stack(), stack)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     public boolean isExpired() {
