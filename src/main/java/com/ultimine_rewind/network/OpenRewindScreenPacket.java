@@ -3,6 +3,7 @@ package com.ultimine_rewind.network;
 import com.ultimine_rewind.UltimineRewind;
 import com.ultimine_rewind.data.RewindDataManager;
 import com.ultimine_rewind.data.UltimineRecord;
+import com.ultimine_rewind.logic.RewindExecutor;
 import com.ultimine_rewind.menu.RewindMenu;
 import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
 import net.minecraft.ChatFormatting;
@@ -31,6 +32,12 @@ public record OpenRewindScreenPacket() implements CustomPacketPayload {
         if (record == null) {
             player.sendOverlayMessage(Component.translatable(
                     "message.ultimine_rewind.no_record").withStyle(ChatFormatting.RED));
+            return;
+        }
+
+        // 材料足够时直接执行，只有需要补充材料才打开界面。
+        if (RewindExecutor.hasEnoughMaterials(player, record)) {
+            RewindExecutor.execute(player, record);
             return;
         }
 

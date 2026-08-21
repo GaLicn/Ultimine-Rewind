@@ -5,18 +5,21 @@ import com.ultimine_rewind.UltimineRewind;
 import com.ultimine_rewind.network.OpenRewindScreenPacket;
 import dev.ftb.mods.ftblibrary.platform.client.PlatformClient;
 import dev.ftb.mods.ftblibrary.platform.network.Play2ServerNetworking;
-import dev.ftb.mods.ftblibrary.platform.client.input.InputHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.neoforged.neoforge.common.NeoForge;
 import org.lwjgl.glfw.GLFW;
 
 public final class KeyBindings {
     private static final KeyMapping.Category CATEGORY = new KeyMapping.Category(
             Identifier.fromNamespaceAndPath(UltimineRewind.MODID, "default"));
-    private static final KeyMapping REWIND = InputHelper.createSimpleKeyMapping(
-            "ultimine_rewind.rewind", CATEGORY, InputConstants.KEY_Z);
+    private static final KeyMapping REWIND = new KeyMapping(
+            "key.ultimine_rewind.default.ultimine_rewind.rewind",
+            KeyConflictContext.IN_GAME, KeyModifier.CONTROL,
+            InputConstants.Type.KEYSYM, InputConstants.KEY_Z, CATEGORY);
 
     private KeyBindings() {
     }
@@ -29,8 +32,7 @@ public final class KeyBindings {
     private static void onKey(InputEvent.Key event) {
         var keyEvent = event.getKeyEvent();
         if (event.getAction() == GLFW.GLFW_PRESS
-                && (keyEvent.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0
-                && REWIND.matches(keyEvent)) {
+                && REWIND.matches(keyEvent) && REWIND.isDown()) {
             Play2ServerNetworking.send(new OpenRewindScreenPacket());
         }
     }

@@ -1,5 +1,8 @@
 {
+  "key.category.ultimine_rewind.default": "Ultimine Rewind",
   "key.categories.ultimine_rewind": "Ultimine Rewind",
+  "key.ultimine_rewind.default.ultimine_rewind": "Rewind Ultimine",
+  "key.ultimine_rewind.default.ultimine_rewind.rewind": "Rewind Ultimine",
   "key.ultimine_rewind.rewind": "Rewind Ultimine",
   "container.ultimine_rewind.rewind_menu": "Ultimine Rewind",
   "gui.ultimine_rewind.panel_title": "Restoration List",
